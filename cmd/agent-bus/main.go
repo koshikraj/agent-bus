@@ -1,0 +1,329 @@
+// Command agent-bus is a local message bus that lets agents (Claude Code,
+// Cursor, scripts, remote bots) talk to each other in both directions.
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"log"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"text/tabwriter"
+	"time"
+
+	"agentbus/internal/adapter"
+	"agentbus/internal/bus"
+	"agentbus/internal/client"
+	"agentbus/internal/httpapi"
+	"agentbus/internal/mcpserver"
+	"agentbus/internal/store"
+)
+
+var version = "dev"
+
+const usage = `agent-bus — two-way messaging between agents
+
+Usage:
+  agent-bus serve [--addr 127.0.0.1:7777] [--db PATH] [--public-url URL]
+  agent-bus mcp --as NAME [--channel] [--url URL]
+  agent-bus agent add NAME [--webhook URL [--auth-file PATH] [--auth-header H]]
+  agent-bus agent list
+  agent-bus agent rm NAME
+  agent-bus send --as NAME --to AGENT [--reply-to MSG_ID] [--thread ID] [--context TEXT] [--wanted TEXT] MESSAGE
+  agent-bus inbox --as NAME [--wait 30s] [--thread ID]
+  agent-bus version
+
+Each agent's token is stored in %s/<name> (mode 0600).
+Environment: AGENT_BUS_URL, AGENT_BUS_DB, AGENT_BUS_NAME, AGENT_BUS_TOKEN.
+`
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Fprintf(os.Stderr, usage, tokenDir())
+		os.Exit(2)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	cmd, args := os.Args[1], os.Args[2:]
+	var err error
+	switch cmd {
+	case "serve":
+		err = serve(ctx, args)
+	case "mcp":
+		err = runMCP(ctx, args)
+	case "agent":
+		err = agentCmd(ctx, args)
+	case "send":
+		err = send(ctx, args)
+	case "inbox":
+		err = inbox(ctx, args)
+	case "version":
+		fmt.Println(version)
+	case "help", "-h", "--help":
+		fmt.Printf(usage, tokenDir())
+	default:
+		err = fmt.Errorf("unknown command %q (try agent-bus help)", cmd)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "agent-bus:", err)
+		os.Exit(1)
+	}
+}
+
+func configDir() string {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		dir = "."
+	}
+	return filepath.Join(dir, "agent-bus")
+}
+
+func tokenDir() string { return filepath.Join(configDir(), "tokens") }
+
+func defaultDB() string { return envOr("AGENT_BUS_DB", filepath.Join(configDir(), "bus.db")) }
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+// parse lets flags and positional arguments appear in any order.
+func parse(fs *flag.FlagSet, args []string) ([]string, error) {
+	var pos []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			return nil, err
+		}
+		if fs.NArg() == 0 {
+			return pos, nil
+		}
+		pos = append(pos, fs.Arg(0))
+		args = fs.Args()[1:]
+	}
+}
+
+func serve(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	addr := fs.String("addr", "127.0.0.1:7777", "listen address")
+	db := fs.String("db", defaultDB(), "SQLite database path")
+	publicURL := fs.String("public-url", "", "externally reachable base URL (e.g. a tunnel), advertised to webhook agents for replies")
+	if _, err := parse(fs, args); err != nil {
+		return err
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	if host, _, err := net.SplitHostPort(*addr); err == nil {
+		if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+			logger.Warn("listening on a non-loopback address; every agent token is a credential for this bus", "addr", *addr)
+		}
+	}
+
+	st, err := store.Open(*db)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	b := bus.New(st, logger, &adapter.Webhook{HTTP: &http.Client{}, PublicURL: *publicURL})
+	go b.RunDelivery(ctx)
+
+	srv := &http.Server{
+		Addr:              *addr,
+		Handler:           httpapi.New(b, logger),
+		ReadHeaderTimeout: 10 * time.Second,
+		WriteTimeout:      bus.MaxWait + 30*time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
+	go func() {
+		<-ctx.Done()
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		srv.Shutdown(sctx)
+	}()
+	logger.Info("agent-bus listening", "addr", *addr, "db", *db, "version", version)
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+// agentClient builds an API client for the agent named by --as.
+func agentClient(fs *flag.FlagSet, args []string) (*client.Client, string, []string, error) {
+	as := fs.String("as", os.Getenv("AGENT_BUS_NAME"), "agent name to act as")
+	url := fs.String("url", envOr("AGENT_BUS_URL", "http://127.0.0.1:7777"), "agent-bus base URL")
+	tokenFile := fs.String("token-file", "", "token file (default: token dir/<name>)")
+	pos, err := parse(fs, args)
+	if err != nil {
+		return nil, "", nil, err
+	}
+	if *as == "" {
+		return nil, "", nil, errors.New("--as NAME is required (or set AGENT_BUS_NAME)")
+	}
+	token := os.Getenv("AGENT_BUS_TOKEN")
+	if token == "" {
+		path := *tokenFile
+		if path == "" {
+			path = filepath.Join(tokenDir(), *as)
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("read token for %q: %w (create it with: agent-bus agent add %s)", *as, err, *as)
+		}
+		token = strings.TrimSpace(string(b))
+	}
+	return client.New(*url, token), *as, pos, nil
+}
+
+func runMCP(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
+	channel := fs.Bool("channel", false, "push incoming messages into Claude Code as channel events")
+	c, name, _, err := agentClient(fs, args)
+	if err != nil {
+		return err
+	}
+	logger := log.New(os.Stderr, "agent-bus mcp: ", log.LstdFlags)
+	return mcpserver.New(c, name, version, *channel, logger).Run(ctx, os.Stdin, os.Stdout)
+}
+
+func send(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("send", flag.ContinueOnError)
+	to := fs.String("to", "", "recipient agent")
+	replyTo := fs.String("reply-to", "", "message_id being answered")
+	thread := fs.String("thread", "", "thread to continue")
+	ctxText := fs.String("context", "", "supporting context")
+	wanted := fs.String("wanted", "", "result wanted back")
+	c, _, pos, err := agentClient(fs, args)
+	if err != nil {
+		return err
+	}
+	meta := map[string]string{}
+	if *ctxText != "" {
+		meta["context"] = *ctxText
+	}
+	if *wanted != "" {
+		meta["wanted"] = *wanted
+	}
+	m, err := c.Send(ctx, bus.SendInput{To: *to, Content: strings.Join(pos, " "), InReplyTo: *replyTo, ThreadID: *thread, Meta: meta})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("sent %s (thread %s)\n", m.ID, m.ThreadID)
+	return nil
+}
+
+func inbox(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("inbox", flag.ContinueOnError)
+	wait := fs.Duration("wait", 0, "long-poll up to this long if empty (max 2m)")
+	thread := fs.String("thread", "", "only this thread")
+	c, _, _, err := agentClient(fs, args)
+	if err != nil {
+		return err
+	}
+	msgs, err := c.Inbox(ctx, *thread, *wait)
+	if err != nil {
+		return err
+	}
+	for _, m := range msgs {
+		fmt.Printf("── %s  from %s  thread %s  %s\n%s\n", m.ID, m.From, m.ThreadID, m.CreatedAt.Local().Format(time.DateTime), m.Content)
+	}
+	if len(msgs) == 0 {
+		fmt.Println("(no new messages)")
+	}
+	return nil
+}
+
+func agentCmd(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: agent-bus agent add|list|rm")
+	}
+	fs := flag.NewFlagSet("agent "+args[0], flag.ContinueOnError)
+	db := fs.String("db", defaultDB(), "SQLite database path")
+	webhook := fs.String("webhook", "", "deliver to this URL instead of an inbox the agent polls")
+	authFile := fs.String("auth-file", "", "file holding the webhook's secret")
+	authHeader := fs.String("auth-header", "", "header for the secret (default Authorization: Bearer)")
+	pos, err := parse(fs, args[1:])
+	if err != nil {
+		return err
+	}
+	st, err := store.Open(*db)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
+	switch args[0] {
+	case "list":
+		agents, err := st.ListAgents(ctx)
+		if err != nil {
+			return err
+		}
+		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+		fmt.Fprintln(tw, "NAME\tDELIVERY\tCREATED")
+		for _, a := range agents {
+			fmt.Fprintf(tw, "%s\t%s\t%s\n", a.Name, a.Delivery, a.CreatedAt.Local().Format(time.DateTime))
+		}
+		return tw.Flush()
+	case "rm":
+		if len(pos) != 1 {
+			return errors.New("usage: agent-bus agent rm NAME")
+		}
+		if err := st.DeleteAgent(ctx, pos[0]); err != nil {
+			return fmt.Errorf("remove %q: %w", pos[0], err)
+		}
+		os.Remove(filepath.Join(tokenDir(), pos[0]))
+		fmt.Printf("removed %s\n", pos[0])
+		return nil
+	case "add":
+		if len(pos) != 1 || !bus.ValidName(pos[0]) {
+			return errors.New("usage: agent-bus agent add NAME (lowercase letters, digits, . _ -)")
+		}
+		name := pos[0]
+		a := bus.Agent{Name: name, Delivery: bus.DeliveryPull, CreatedAt: time.Now().UTC()}
+		if *webhook != "" {
+			a.Delivery = "webhook"
+			a.Config = map[string]string{"url": *webhook}
+			if *authFile != "" {
+				abs, err := filepath.Abs(*authFile)
+				if err != nil {
+					return err
+				}
+				if _, err := os.Stat(abs); err != nil {
+					return fmt.Errorf("auth file: %w", err)
+				}
+				a.Config["auth_file"] = abs
+			}
+			if *authHeader != "" {
+				a.Config["auth_header"] = *authHeader
+			}
+		}
+		token := bus.NewToken()
+		a.TokenHash = bus.HashToken(token)
+		if err := os.MkdirAll(tokenDir(), 0o700); err != nil {
+			return err
+		}
+		path := filepath.Join(tokenDir(), name)
+		if _, err := os.Stat(path); err == nil {
+			return fmt.Errorf("token file %s already exists; remove the agent first", path)
+		}
+		if err := st.CreateAgent(ctx, a); err != nil {
+			return fmt.Errorf("add %q: %w", name, err)
+		}
+		if err := os.WriteFile(path, []byte(token+"\n"), 0o600); err != nil {
+			st.DeleteAgent(ctx, name)
+			return err
+		}
+		fmt.Printf("added %s (%s delivery); token saved to %s\n", name, a.Delivery, path)
+		return nil
+	default:
+		return fmt.Errorf("unknown agent subcommand %q", args[0])
+	}
+}

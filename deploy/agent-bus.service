@@ -1,0 +1,13 @@
+# systemd user unit. Install:
+#   cp deploy/agent-bus.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now agent-bus
+[Unit]
+Description=agent-bus local agent message bus
+
+[Service]
+ExecStart=%h/.local/bin/agent-bus serve
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
