@@ -12,8 +12,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"text/tabwriter"
@@ -35,6 +37,7 @@ Usage:
   agent-bus serve [--addr 127.0.0.1:7777] [--db PATH] [--public-url URL]
   agent-bus mcp --as NAME [--channel] [--url URL]
   agent-bus agent add NAME [--webhook URL [--auth-file PATH] [--auth-header H]]
+  agent-bus agent add NAME --acp "COMMAND" [--cwd DIR] [--permission reject|allow] [--timeout 20m] [--max-replies 10]
   agent-bus agent list
   agent-bus agent rm NAME
   agent-bus send --as NAME --to AGENT [--reply-to MSG_ID] [--thread ID] [--context TEXT] [--wanted TEXT] MESSAGE
@@ -133,7 +136,10 @@ func serve(ctx context.Context, args []string) error {
 		return err
 	}
 	defer st.Close()
-	b := bus.New(st, logger, &adapter.Webhook{HTTP: &http.Client{}, PublicURL: *publicURL})
+	acp := &adapter.ACP{State: st, Log: logger, Version: version}
+	b := bus.New(st, logger, &adapter.Webhook{HTTP: &http.Client{}, PublicURL: *publicURL}, acp)
+	acp.Bus = b
+	acp.Start(ctx)
 	go b.RunDelivery(ctx)
 
 	srv := &http.Server{
@@ -250,6 +256,11 @@ func agentCmd(ctx context.Context, args []string) error {
 	webhook := fs.String("webhook", "", "deliver to this URL instead of an inbox the agent polls")
 	authFile := fs.String("auth-file", "", "file holding the webhook's secret")
 	authHeader := fs.String("auth-header", "", "header for the secret (default Authorization: Bearer)")
+	acpCmd := fs.String("acp", "", `run this ACP agent command for each message (e.g. "grok agent stdio")`)
+	cwd := fs.String("cwd", "", "working directory for the ACP agent (default: home directory)")
+	permission := fs.String("permission", "reject", "ACP tool calls that ask for approval: reject or allow")
+	timeout := fs.Duration("timeout", 0, "longest an ACP turn may run (default 20m)")
+	maxReplies := fs.Int("max-replies", -1, "ACP answers per thread before the agent stops replying (default 10, 0 = no limit)")
 	pos, err := parse(fs, args[1:])
 	if err != nil {
 		return err
@@ -288,6 +299,39 @@ func agentCmd(ctx context.Context, args []string) error {
 		}
 		name := pos[0]
 		a := bus.Agent{Name: name, Delivery: bus.DeliveryPull, CreatedAt: time.Now().UTC()}
+		if *webhook != "" && *acpCmd != "" {
+			return errors.New("use either --webhook or --acp, not both")
+		}
+		if *acpCmd != "" {
+			argv := strings.Fields(*acpCmd)
+			if len(argv) == 0 {
+				return errors.New("--acp needs a command")
+			}
+			if _, err := exec.LookPath(argv[0]); err != nil {
+				return fmt.Errorf("acp command: %w", err)
+			}
+			if *permission != "reject" && *permission != "allow" {
+				return errors.New("--permission must be reject or allow")
+			}
+			a.Delivery = "acp"
+			a.Config = map[string]string{"command": *acpCmd, "permission": *permission}
+			if *cwd != "" {
+				abs, err := filepath.Abs(*cwd)
+				if err != nil {
+					return err
+				}
+				if fi, err := os.Stat(abs); err != nil || !fi.IsDir() {
+					return fmt.Errorf("--cwd %s is not a directory", abs)
+				}
+				a.Config["cwd"] = abs
+			}
+			if *timeout > 0 {
+				a.Config["timeout"] = timeout.String()
+			}
+			if *maxReplies >= 0 {
+				a.Config["max_replies"] = strconv.Itoa(*maxReplies)
+			}
+		}
 		if *webhook != "" {
 			a.Delivery = "webhook"
 			a.Config = map[string]string{"url": *webhook}
