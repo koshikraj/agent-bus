@@ -156,7 +156,8 @@ func TestChannelPush(t *testing.T) {
 	}
 	p := n["params"].(map[string]any)
 	meta := p["meta"].(map[string]any)
-	if p["content"] != "build broke on main" || meta["message_id"] != m.ID || meta["branch"] != "main" {
+	content := p["content"].(string)
+	if !strings.HasPrefix(content, "build broke on main\n\n(Message from agent cursor") || !strings.Contains(content, m.ID) || meta["message_id"] != m.ID || meta["branch"] != "main" {
 		t.Fatalf("notification = %v", p)
 	}
 	if meta["from"] != "cursor" {

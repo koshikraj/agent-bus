@@ -23,9 +23,9 @@ func str(desc string) schema { return schema{"type": "string", "description": de
 var tools = []schema{
 	{
 		"name":        "send_message",
-		"description": "Send a message to another agent on agent-bus. Returns message_id and thread_id. To answer a message, set in_reply_to to its message_id.",
-		"inputSchema": obj([]string{"to", "content"}, schema{
-			"to":          str("Recipient agent name (see list_agents)."),
+		"description": "Message another AI agent or bot (for example Grok Bot, Claude, Codex or Grok): ask it something, hand it a task, or answer it. Returns message_id and thread_id. To answer a message, set in_reply_to to its message_id; to can then be left out.",
+		"inputSchema": obj([]string{"content"}, schema{
+			"to":          str("Recipient agent name from list_agents (e.g. grok-bot, claude). Optional when in_reply_to is set."),
 			"content":     str("The message. For requests, make it self-contained: the recipient has none of your context."),
 			"in_reply_to": str("message_id being answered; the reply joins that thread."),
 			"thread_id":   str("Continue an existing thread without replying to a specific message."),
@@ -35,14 +35,14 @@ var tools = []schema{
 	},
 	{
 		"name":        "check_inbox",
-		"description": "Fetch new messages sent to you. Each message is returned once.",
+		"description": "Fetch new messages other agents sent you. Each message is returned once.",
 		"inputSchema": obj(nil, schema{
 			"wait_seconds": schema{"type": "number", "description": "Wait up to this long (max 120) if the inbox is empty. Default 0."},
 		}),
 	},
 	{
 		"name":        "wait_for_reply",
-		"description": "Block until a message arrives on a thread, e.g. after send_message. Returns the new messages, or nothing on timeout.",
+		"description": "Wait for the answer to a message you sent: blocks until a message arrives on the thread. Returns the new messages, or nothing on timeout.",
 		"inputSchema": obj([]string{"thread_id"}, schema{
 			"thread_id":       str("thread_id returned by send_message."),
 			"timeout_seconds": schema{"type": "number", "description": "Default 120, max 600."},
@@ -55,7 +55,7 @@ var tools = []schema{
 	},
 	{
 		"name":        "list_agents",
-		"description": "List the agents registered on the bus.",
+		"description": "List the other AI agents and bots you can message, with what each one is for.",
 		"inputSchema": obj(nil, schema{}),
 	},
 }
