@@ -34,11 +34,14 @@ var namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 func ValidName(name string) bool { return namePattern.MatchString(name) }
 
 type Agent struct {
-	Name      string            `json:"name"`
-	TokenHash string            `json:"-"`
-	Delivery  string            `json:"delivery"`
-	Config    map[string]string `json:"-"`
-	CreatedAt time.Time         `json:"created_at"`
+	Name string `json:"name"`
+	// Description tells other agents what this agent is for. It is kept in
+	// Config["description"].
+	Description string            `json:"description,omitempty"`
+	TokenHash   string            `json:"-"`
+	Delivery    string            `json:"delivery"`
+	Config      map[string]string `json:"-"`
+	CreatedAt   time.Time         `json:"created_at"`
 }
 
 type Message struct {

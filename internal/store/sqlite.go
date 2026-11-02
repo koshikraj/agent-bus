@@ -91,7 +91,11 @@ func scanAgent(r scanner) (bus.Agent, error) {
 		return a, err
 	}
 	a.CreatedAt = time.UnixMilli(created).UTC()
-	return a, json.Unmarshal([]byte(cfg), &a.Config)
+	if err := json.Unmarshal([]byte(cfg), &a.Config); err != nil {
+		return a, err
+	}
+	a.Description = a.Config["description"]
+	return a, nil
 }
 
 func scanMessage(r scanner) (bus.Message, error) {
@@ -304,5 +308,27 @@ func (s *SQLite) GetState(ctx context.Context, key string) (string, error) {
 func (s *SQLite) SetState(ctx context.Context, key, value string) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO state (key, value) VALUES (?, ?)
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
+	return err
+}
+
+// SetAgentConfig sets one config key for an agent; an empty value removes it.
+func (s *SQLite) SetAgentConfig(ctx context.Context, name, key, value string) error {
+	a, err := s.GetAgent(ctx, name)
+	if err != nil {
+		return err
+	}
+	if a.Config == nil {
+		a.Config = map[string]string{}
+	}
+	if value == "" {
+		delete(a.Config, key)
+	} else {
+		a.Config[key] = value
+	}
+	cfg, err := json.Marshal(a.Config)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE agents SET config = ? WHERE name = ?`, string(cfg), name)
 	return err
 }

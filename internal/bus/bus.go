@@ -73,19 +73,14 @@ func (b *Bus) Authenticate(ctx context.Context, token string) (Agent, error) {
 func (b *Bus) Agents(ctx context.Context) ([]Agent, error) { return b.store.ListAgents(ctx) }
 
 // Send queues a message from the authenticated agent from. Replies inherit
-// the parent's thread, and only participants may post into an existing thread.
+// the parent's thread (and its other participant when To is empty), and only
+// participants may post into an existing thread.
 func (b *Bus) Send(ctx context.Context, from string, in SendInput) (Message, error) {
-	if in.To == "" || strings.TrimSpace(in.Content) == "" {
-		return Message{}, fmt.Errorf("%w: to and content are required", ErrInvalid)
+	if strings.TrimSpace(in.Content) == "" {
+		return Message{}, fmt.Errorf("%w: content is required", ErrInvalid)
 	}
 	if len(in.Content) > MaxContentBytes {
 		return Message{}, fmt.Errorf("%w: content exceeds %d bytes", ErrInvalid, MaxContentBytes)
-	}
-	to, err := b.store.GetAgent(ctx, in.To)
-	if errors.Is(err, ErrNotFound) {
-		return Message{}, fmt.Errorf("%w: unknown agent %q", ErrNotFound, in.To)
-	} else if err != nil {
-		return Message{}, err
 	}
 
 	thread := in.ThreadID
@@ -103,6 +98,12 @@ func (b *Bus) Send(ctx context.Context, from string, in SendInput) (Message, err
 			return Message{}, fmt.Errorf("%w: thread_id does not match in_reply_to", ErrInvalid)
 		}
 		thread = parent.ThreadID
+		if in.To == "" {
+			in.To = parent.From
+			if parent.From == from {
+				in.To = parent.To
+			}
+		}
 	} else if thread != "" {
 		exists, member, err := b.store.ThreadAccess(ctx, thread, from)
 		if err != nil {
@@ -111,6 +112,15 @@ func (b *Bus) Send(ctx context.Context, from string, in SendInput) (Message, err
 		if exists && !member {
 			return Message{}, fmt.Errorf("%w: not a participant in thread %q", ErrForbidden, thread)
 		}
+	}
+	if in.To == "" {
+		return Message{}, fmt.Errorf("%w: to is required unless in_reply_to is set", ErrInvalid)
+	}
+	to, err := b.store.GetAgent(ctx, in.To)
+	if errors.Is(err, ErrNotFound) {
+		return Message{}, fmt.Errorf("%w: unknown agent %q", ErrNotFound, in.To)
+	} else if err != nil {
+		return Message{}, err
 	}
 
 	id := randHex(12)

@@ -36,11 +36,13 @@ const usage = `agent-bus — two-way messaging between agents
 Usage:
   agent-bus serve [--addr 127.0.0.1:7777] [--db PATH] [--public-url URL]
   agent-bus mcp --as NAME [--channel] [--url URL]
-  agent-bus agent add NAME [--webhook URL [--auth-file PATH] [--auth-header H]]
+  agent-bus agent add NAME [--description TEXT] [--webhook URL [--auth-file PATH] [--auth-header H]]
   agent-bus agent add NAME --acp "COMMAND" [--cwd DIR] [--permission reject|allow] [--timeout 20m] [--max-replies 10]
+  agent-bus agent describe NAME TEXT
   agent-bus agent list
   agent-bus agent rm NAME
-  agent-bus send --as NAME --to AGENT [--reply-to MSG_ID] [--thread ID] [--context TEXT] [--wanted TEXT] MESSAGE
+  agent-bus send --as NAME --to AGENT [--thread ID] [--context TEXT] [--wanted TEXT] MESSAGE
+  agent-bus reply --as NAME MSG_ID MESSAGE
   agent-bus inbox --as NAME [--wait 30s] [--thread ID]
   agent-bus version
 
@@ -67,6 +69,8 @@ func main() {
 		err = agentCmd(ctx, args)
 	case "send":
 		err = send(ctx, args)
+	case "reply":
+		err = reply(ctx, args)
 	case "inbox":
 		err = inbox(ctx, args)
 	case "version":
@@ -226,6 +230,23 @@ func send(ctx context.Context, args []string) error {
 	return nil
 }
 
+func reply(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("reply", flag.ContinueOnError)
+	c, _, pos, err := agentClient(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) < 2 {
+		return errors.New("usage: agent-bus reply --as NAME MSG_ID MESSAGE")
+	}
+	m, err := c.Send(ctx, bus.SendInput{InReplyTo: pos[0], Content: strings.Join(pos[1:], " ")})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("replied to %s with %s (thread %s)\n", m.To, m.ID, m.ThreadID)
+	return nil
+}
+
 func inbox(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("inbox", flag.ContinueOnError)
 	wait := fs.Duration("wait", 0, "long-poll up to this long if empty (max 2m)")
@@ -256,6 +277,7 @@ func agentCmd(ctx context.Context, args []string) error {
 	webhook := fs.String("webhook", "", "deliver to this URL instead of an inbox the agent polls")
 	authFile := fs.String("auth-file", "", "file holding the webhook's secret")
 	authHeader := fs.String("auth-header", "", "header for the secret (default Authorization: Bearer)")
+	description := fs.String("description", "", "what this agent is for, shown to other agents")
 	acpCmd := fs.String("acp", "", `run this ACP agent command for each message (e.g. "grok agent stdio")`)
 	cwd := fs.String("cwd", "", "working directory for the ACP agent (default: home directory)")
 	permission := fs.String("permission", "reject", "ACP tool calls that ask for approval: reject or allow")
@@ -278,11 +300,20 @@ func agentCmd(ctx context.Context, args []string) error {
 			return err
 		}
 		tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(tw, "NAME\tDELIVERY\tCREATED")
+		fmt.Fprintln(tw, "NAME\tDELIVERY\tCREATED\tDESCRIPTION")
 		for _, a := range agents {
-			fmt.Fprintf(tw, "%s\t%s\t%s\n", a.Name, a.Delivery, a.CreatedAt.Local().Format(time.DateTime))
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", a.Name, a.Delivery, a.CreatedAt.Local().Format(time.DateTime), a.Description)
 		}
 		return tw.Flush()
+	case "describe":
+		if len(pos) < 2 {
+			return errors.New("usage: agent-bus agent describe NAME TEXT")
+		}
+		if err := st.SetAgentConfig(ctx, pos[0], "description", strings.Join(pos[1:], " ")); err != nil {
+			return fmt.Errorf("describe %q: %w", pos[0], err)
+		}
+		fmt.Printf("updated %s\n", pos[0])
+		return nil
 	case "rm":
 		if len(pos) != 1 {
 			return errors.New("usage: agent-bus agent rm NAME")
@@ -348,6 +379,12 @@ func agentCmd(ctx context.Context, args []string) error {
 			if *authHeader != "" {
 				a.Config["auth_header"] = *authHeader
 			}
+		}
+		if *description != "" {
+			if a.Config == nil {
+				a.Config = map[string]string{}
+			}
+			a.Config["description"] = *description
 		}
 		token := bus.NewToken()
 		a.TokenHash = bus.HashToken(token)

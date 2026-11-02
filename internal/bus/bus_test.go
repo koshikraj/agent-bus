@@ -180,3 +180,24 @@ func TestWebhookDelivery(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+func TestReplyInfersRecipient(t *testing.T) {
+	ctx := context.Background()
+	b, st := newBus(t)
+	addAgent(t, st, "alice", nil)
+	addAgent(t, st, "bob", nil)
+
+	req, _ := b.Send(ctx, "alice", bus.SendInput{To: "bob", Content: "ping"})
+	reply, err := b.Send(ctx, "bob", bus.SendInput{InReplyTo: req.ID, Content: "pong"})
+	if err != nil || reply.To != "alice" || reply.ThreadID != req.ThreadID {
+		t.Fatalf("bob's reply = %+v, %v; want it addressed to alice on %s", reply, err, req.ThreadID)
+	}
+	// Following up on your own message goes to the same recipient.
+	again, err := b.Send(ctx, "alice", bus.SendInput{InReplyTo: req.ID, Content: "still there?"})
+	if err != nil || again.To != "bob" {
+		t.Fatalf("alice's follow-up = %+v, %v; want it addressed to bob", again, err)
+	}
+	if _, err := b.Send(ctx, "alice", bus.SendInput{Content: "to nobody"}); !errors.Is(err, bus.ErrInvalid) {
+		t.Fatalf("send without to or in_reply_to: err = %v, want ErrInvalid", err)
+	}
+}
