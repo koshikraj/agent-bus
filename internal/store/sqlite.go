@@ -43,6 +43,10 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS messages_inbox ON messages(recipient, status, seq);
 CREATE INDEX IF NOT EXISTS messages_thread ON messages(thread_id, seq);
+CREATE TABLE IF NOT EXISTS state (
+	key   TEXT PRIMARY KEY,
+	value TEXT NOT NULL
+);
 `
 
 const (
@@ -284,5 +288,21 @@ func (s *SQLite) RecordFailure(ctx context.Context, id, errMsg string, next time
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE messages SET attempts = attempts + 1, last_error = ?, next_attempt_at = ?, status = ? WHERE id = ?`,
 		errMsg, next.UnixMilli(), status, id)
+	return err
+}
+
+// GetState returns adapter state saved under key, or bus.ErrNotFound.
+func (s *SQLite) GetState(ctx context.Context, key string) (string, error) {
+	var v string
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM state WHERE key = ?`, key).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", bus.ErrNotFound
+	}
+	return v, err
+}
+
+func (s *SQLite) SetState(ctx context.Context, key, value string) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO state (key, value) VALUES (?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
 	return err
 }
