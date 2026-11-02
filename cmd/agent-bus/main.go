@@ -35,7 +35,7 @@ const usage = `agent-bus — two-way messaging between agents
 
 Usage:
   agent-bus serve [--addr 127.0.0.1:7777] [--db PATH] [--public-url URL]
-  agent-bus mcp --as NAME [--channel] [--url URL]
+  agent-bus mcp --as NAME [--channel [--server-name agent-bus]] [--url URL]
   agent-bus agent add NAME [--description TEXT] [--webhook URL [--auth-file PATH] [--auth-header H]]
   agent-bus agent add NAME --acp "COMMAND" [--cwd DIR] [--permission reject|allow] [--timeout 20m] [--max-replies 10]
   agent-bus agent describe NAME TEXT
@@ -196,11 +196,19 @@ func agentClient(fs *flag.FlagSet, args []string) (*client.Client, string, []str
 func runMCP(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
 	channel := fs.Bool("channel", false, "push incoming messages into Claude Code as channel events")
+	serverName := fs.String("server-name", "agent-bus", "this server's name in the Claude Code MCP config, as used in server:NAME")
 	c, name, _, err := agentClient(fs, args)
 	if err != nil {
 		return err
 	}
 	logger := log.New(os.Stderr, "agent-bus mcp: ", log.LstdFlags)
+	if *channel {
+		// Only take incoming messages in a session that will show them.
+		if enabled, found := mcpserver.ChannelLaunch(*serverName); found && !enabled {
+			logger.Printf("this Claude Code session wasn't started with --dangerously-load-development-channels server:%s; leaving incoming messages for a session that was (tools still work)", *serverName)
+			*channel = false
+		}
+	}
 	return mcpserver.New(c, name, version, *channel, logger).Run(ctx, os.Stdin, os.Stdout)
 }
 
