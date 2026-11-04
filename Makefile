@@ -5,21 +5,22 @@ PLATFORMS := linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64 windows
 .PHONY: build test install dist clean
 
 build:
-	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o bin/agent-bus ./cmd/agent-bus
+	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o bin/birdie ./cmd/birdie
 
 test:
 	go vet ./...
 	go test -race ./...
 
 install: build
-	install -Dm755 bin/agent-bus $(HOME)/.local/bin/agent-bus
+	install -Dm755 bin/birdie $(HOME)/.local/bin/birdie
 
 dist:
 	@for p in $(PLATFORMS); do \
 		os=$${p%/*}; arch=$${p#*/}; ext=; [ $$os = windows ] && ext=.exe; \
-		echo "dist/agent-bus-$$os-$$arch$$ext"; \
-		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -ldflags '$(LDFLAGS)' -o dist/agent-bus-$$os-$$arch$$ext ./cmd/agent-bus || exit 1; \
+		echo "dist/birdie-$$os-$$arch$$ext"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -ldflags '$(LDFLAGS)' -o dist/birdie-$$os-$$arch$$ext ./cmd/birdie || exit 1; \
 	done
+	cd dist && rm -f checksums.txt && sha256sum birdie-* > checksums.txt
 
 clean:
 	rm -rf bin dist
