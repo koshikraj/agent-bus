@@ -4,20 +4,22 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"log/slog"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"agentbus/internal/bus"
-	"agentbus/internal/client"
-	"agentbus/internal/httpapi"
-	"agentbus/internal/mcpserver"
-	"agentbus/internal/store"
+	"birdie/internal/bus"
+	"birdie/internal/client"
+	"birdie/internal/httpapi"
+	"birdie/internal/mcpserver"
+	"birdie/internal/store"
 )
 
 // session drives a Server over pipes the way an MCP client would.
@@ -157,7 +159,7 @@ func TestChannelPush(t *testing.T) {
 	p := n["params"].(map[string]any)
 	meta := p["meta"].(map[string]any)
 	content := p["content"].(string)
-	if !strings.HasPrefix(content, "build broke on main\n\n(Message from agent cursor") || !strings.Contains(content, m.ID) || meta["message_id"] != m.ID || meta["branch"] != "main" {
+	if !strings.Contains(content, "build broke on main\n</birdie-message>\nFrom agent cursor") || !strings.Contains(content, m.ID) || meta["message_id"] != m.ID || meta["branch"] != "main" {
 		t.Fatalf("notification = %v", p)
 	}
 	if meta["from"] != "cursor" {
@@ -165,5 +167,161 @@ func TestChannelPush(t *testing.T) {
 	}
 	if !strings.HasPrefix(meta["thread_id"].(string), "thr_") {
 		t.Fatalf("thread_id = %v", meta["thread_id"])
+	}
+}
+
+// fakeHost is an agent program that records what it is shown.
+type fakeHost struct {
+	tier   string
+	pushed chan bus.Message
+	fail   atomic.Bool
+}
+
+func (h *fakeHost) Session() mcpserver.SessionInfo {
+	return mcpserver.SessionInfo{ID: "sess-1", Name: "api", Cwd: "/work/api"}
+}
+func (h *fakeHost) Tier() string            { return h.tier }
+func (h *fakeHost) Observe(json.RawMessage) {}
+func (h *fakeHost) Push(_ context.Context, m bus.Message) error {
+	if h.fail.Load() {
+		return errors.New("socket gone")
+	}
+	h.pushed <- m
+	return nil
+}
+
+func setupHost(t *testing.T, h *fakeHost) (*session, *client.Client, *store.SQLite) {
+	t.Helper()
+	st, err := store.Open(filepath.Join(t.TempDir(), "bus.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	for _, n := range []string{"claude", "cursor"} {
+		st.CreateAgent(context.Background(), bus.Agent{Name: n, TokenHash: bus.HashToken(n + "-tok"), Delivery: bus.DeliveryPull, CreatedAt: time.Now()})
+	}
+	b := bus.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	api := httptest.NewServer(httpapi.New(b, slog.New(slog.NewTextHandler(io.Discard, nil))))
+	t.Cleanup(api.Close)
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+	srv := mcpserver.New(client.New(api.URL, "claude-tok"), "claude", "test", false, log.New(io.Discard, "", 0))
+	srv.DetectHost = func(string) mcpserver.Host { return h }
+	ctx, cancel := context.WithCancel(context.Background())
+	go srv.Run(ctx, inR, outW)
+	t.Cleanup(func() { inW.Close(); cancel() })
+	s := &session{t: t, in: inW, out: bufio.NewScanner(outR)}
+	s.call("initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "test"}})
+	s.send(map[string]any{"jsonrpc": "2.0", "method": "notifications/initialized"})
+	return s, client.New(api.URL, "cursor-tok"), st
+}
+
+func waitFor(t *testing.T, what string, ok func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !ok() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func sessionLive(cursor *client.Client) func() bool {
+	return func() bool {
+		agents, err := cursor.Agents(context.Background())
+		if err != nil {
+			return false
+		}
+		for _, a := range agents {
+			if a.Name == "claude" && len(a.Sessions) == 1 {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+func TestPushHostGetsMessagesAndConfirmsThem(t *testing.T) {
+	h := &fakeHost{tier: bus.TierPush, pushed: make(chan bus.Message, 4)}
+	s, cursor, st := setupHost(t, h)
+	waitFor(t, "the session to register", sessionLive(cursor))
+
+	m, err := cursor.Send(context.Background(), bus.SendInput{To: "claude", Content: "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(m.Note, "claude/api gets this right away") {
+		t.Fatalf("note = %q", m.Note)
+	}
+	select {
+	case got := <-h.pushed:
+		if got.ID != m.ID {
+			t.Fatalf("pushed %s", got.ID)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("message never pushed")
+	}
+	waitFor(t, "delivery to be confirmed", func() bool {
+		got, _ := st.GetMessage(context.Background(), m.ID)
+		return got.Status == bus.StatusDelivered
+	})
+
+	// The session's answer records where it came from, so answers to it return here.
+	sent := toolJSON(t, s.call("tools/call", map[string]any{"name": "send_message", "arguments": map[string]any{"in_reply_to": m.ID, "content": "hi back"}}))
+	got, _ := st.GetMessage(context.Background(), sent["message_id"].(string))
+	if got.FromSession != "sess-1" {
+		t.Fatalf("from_session = %q", got.FromSession)
+	}
+	if orig, _ := st.GetMessage(context.Background(), m.ID); orig.Status != bus.StatusReplied {
+		t.Fatalf("status = %q", orig.Status)
+	}
+}
+
+func TestFailedPushStaysForLater(t *testing.T) {
+	h := &fakeHost{tier: bus.TierPush, pushed: make(chan bus.Message, 4)}
+	h.fail.Store(true)
+	_, cursor, st := setupHost(t, h)
+	waitFor(t, "the session to register", sessionLive(cursor))
+
+	m, err := cursor.Send(context.Background(), bus.SendInput{To: "claude", Content: "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the message to return to the queue", func() bool {
+		got, _ := st.GetMessage(context.Background(), m.ID)
+		return got.Attempts == 0 && got.Status == bus.StatusQueued
+	})
+	h.fail.Store(false)
+	select {
+	case got := <-h.pushed:
+		if got.ID != m.ID {
+			t.Fatalf("pushed %s", got.ID)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("message wasn't pushed once the host recovered")
+	}
+}
+
+func TestPullHostGetsUnreadNotice(t *testing.T) {
+	h := &fakeHost{tier: bus.TierPull, pushed: make(chan bus.Message, 1)}
+	s, cursor, _ := setupHost(t, h)
+	waitFor(t, "the session to register", sessionLive(cursor))
+	if _, err := cursor.Send(context.Background(), bus.SendInput{To: "claude", Content: "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	res := s.call("tools/call", map[string]any{"name": "list_agents", "arguments": map[string]any{}})
+	text := res["content"].([]any)[0].(map[string]any)["text"].(string)
+	if !strings.Contains(text, "1 unread birdie message") {
+		t.Fatalf("no unread notice: %s", text)
+	}
+	got := toolJSON(t, s.call("tools/call", map[string]any{"name": "check_inbox", "arguments": map[string]any{}}))
+	if msgs := got["messages"].([]any); len(msgs) != 1 {
+		t.Fatalf("check_inbox = %v", got)
+	}
+	select {
+	case m := <-h.pushed:
+		t.Fatalf("a pull host was pushed %+v", m)
+	default:
 	}
 }

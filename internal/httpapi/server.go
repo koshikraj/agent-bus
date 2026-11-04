@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"agentbus/internal/bus"
+	"birdie/internal/bus"
 )
 
 const maxBody = 2 << 20
@@ -31,6 +31,11 @@ func New(b *bus.Bus, log *slog.Logger) http.Handler {
 	mux.HandleFunc("GET /v1/agents", s.auth(s.agents))
 	mux.HandleFunc("POST /v1/messages", s.auth(s.send))
 	mux.HandleFunc("GET /v1/inbox", s.auth(s.inbox))
+	mux.HandleFunc("GET /v1/unread", s.auth(s.unread))
+	mux.HandleFunc("POST /v1/messages/{id}/ack", s.auth(s.ack))
+	mux.HandleFunc("POST /v1/messages/{id}/nack", s.auth(s.nack))
+	mux.HandleFunc("PUT /v1/sessions/{id}", s.auth(s.reportSession))
+	mux.HandleFunc("DELETE /v1/sessions/{id}", s.auth(s.endSession))
 	mux.HandleFunc("GET /v1/threads/{id}", s.auth(s.thread))
 	return mux
 }
@@ -86,12 +91,67 @@ func (s *server) inbox(w http.ResponseWriter, r *http.Request, a bus.Agent) {
 		}
 		wait = time.Duration(secs * float64(time.Second))
 	}
-	msgs, err := s.b.Receive(r.Context(), a.Name, r.URL.Query().Get("thread_id"), wait)
+	in := bus.ReceiveInput{Agent: a.Name, Thread: r.URL.Query().Get("thread_id"), Session: r.URL.Query().Get("session"), Wait: wait}
+	if v := r.URL.Query().Get("lease"); v != "" {
+		secs, err := strconv.ParseFloat(v, 64)
+		if err != nil || secs < 0 {
+			s.fail(w, errors.Join(bus.ErrInvalid, errors.New("lease must be a non-negative number of seconds")))
+			return
+		}
+		in.Lease = time.Duration(secs * float64(time.Second))
+	}
+	msgs, err := s.b.ReceiveFor(r.Context(), in)
 	if err != nil {
 		s.fail(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"messages": msgs})
+}
+
+func (s *server) unread(w http.ResponseWriter, r *http.Request, a bus.Agent) {
+	n, err := s.b.Unread(r.Context(), bus.ReceiveInput{Agent: a.Name, Session: r.URL.Query().Get("session")})
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"unread": n})
+}
+
+func (s *server) ack(w http.ResponseWriter, r *http.Request, a bus.Agent) {
+	if err := s.b.Ack(r.Context(), a.Name, r.PathValue("id")); err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) nack(w http.ResponseWriter, r *http.Request, a bus.Agent) {
+	if err := s.b.Nack(r.Context(), a.Name, r.PathValue("id")); err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) reportSession(w http.ResponseWriter, r *http.Request, a bus.Agent) {
+	var in bus.SessionInput
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&in); err != nil {
+		s.fail(w, errors.Join(bus.ErrInvalid, err))
+		return
+	}
+	if err := s.b.ReportSession(r.Context(), a.Name, r.PathValue("id"), in); err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) endSession(w http.ResponseWriter, r *http.Request, a bus.Agent) {
+	if err := s.b.EndSession(r.Context(), a.Name, r.PathValue("id")); err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *server) thread(w http.ResponseWriter, r *http.Request, a bus.Agent) {
@@ -114,6 +174,8 @@ func (s *server) fail(w http.ResponseWriter, err error) {
 		status = http.StatusForbidden
 	case errors.Is(err, bus.ErrNotFound):
 		status = http.StatusNotFound
+	case errors.Is(err, bus.ErrLoop):
+		status = http.StatusTooManyRequests
 	case errors.Is(err, context.Canceled):
 		return // client went away
 	}

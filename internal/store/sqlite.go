@@ -14,7 +14,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"agentbus/internal/bus"
+	"birdie/internal/bus"
 )
 
 const schema = `
@@ -47,10 +47,30 @@ CREATE TABLE IF NOT EXISTS state (
 	key   TEXT PRIMARY KEY,
 	value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sessions (
+	agent     TEXT NOT NULL,
+	id        TEXT NOT NULL,
+	name      TEXT NOT NULL DEFAULT '',
+	cwd       TEXT NOT NULL DEFAULT '',
+	tier      TEXT NOT NULL DEFAULT 'pull',
+	active_at INTEGER NOT NULL,
+	last_seen INTEGER NOT NULL,
+	PRIMARY KEY (agent, id)
+);
 `
 
+// columns added to existing databases, oldest first.
+var addedColumns = []struct{ table, column, def string }{
+	{"messages", "from_session", "TEXT NOT NULL DEFAULT ''"},
+	{"messages", "to_session", "TEXT NOT NULL DEFAULT ''"},
+	{"messages", "lease_until", "INTEGER NOT NULL DEFAULT 0"},
+}
+
+// sessionRetention is how long a session that stopped reporting is remembered.
+const sessionRetention = 24 * time.Hour
+
 const (
-	msgCols   = `m.id, m.thread_id, m.in_reply_to, m.sender, m.recipient, m.content, m.meta, m.status, m.attempts, m.created_at`
+	msgCols   = `m.id, m.thread_id, m.in_reply_to, m.sender, m.recipient, m.from_session, m.to_session, m.content, m.meta, m.status, m.attempts, m.created_at`
 	agentCols = `a.name, a.token_hash, a.delivery, a.config, a.created_at`
 )
 
@@ -73,7 +93,26 @@ func Open(path string) (*SQLite, error) {
 		db.Close()
 		return nil, fmt.Errorf("migrate %s: %w", path, err)
 	}
+	if err := addColumns(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate %s: %w", path, err)
+	}
 	return &SQLite{db: db}, nil
+}
+
+func addColumns(db *sql.DB) error {
+	for _, c := range addedColumns {
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, c.table, c.column).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			if _, err := db.Exec(`ALTER TABLE ` + c.table + ` ADD COLUMN ` + c.column + ` ` + c.def); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (s *SQLite) Close() error { return s.db.Close() }
@@ -102,7 +141,7 @@ func scanMessage(r scanner) (bus.Message, error) {
 	var m bus.Message
 	var meta string
 	var created int64
-	if err := r.Scan(&m.ID, &m.ThreadID, &m.InReplyTo, &m.From, &m.To, &m.Content, &meta, &m.Status, &m.Attempts, &created); err != nil {
+	if err := r.Scan(&m.ID, &m.ThreadID, &m.InReplyTo, &m.From, &m.To, &m.FromSession, &m.ToSession, &m.Content, &meta, &m.Status, &m.Attempts, &created); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return m, bus.ErrNotFound
 		}
@@ -193,9 +232,9 @@ func (s *SQLite) InsertMessage(ctx context.Context, m bus.Message) error {
 		}
 	}
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO messages (id, thread_id, in_reply_to, sender, recipient, content, meta, status, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.ID, m.ThreadID, m.InReplyTo, m.From, m.To, m.Content, string(meta), m.Status, m.CreatedAt.UnixMilli())
+		`INSERT INTO messages (id, thread_id, in_reply_to, sender, recipient, from_session, to_session, content, meta, status, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.ID, m.ThreadID, m.InReplyTo, m.From, m.To, m.FromSession, m.ToSession, m.Content, string(meta), m.Status, m.CreatedAt.UnixMilli())
 	return err
 }
 
@@ -217,34 +256,69 @@ func (s *SQLite) Thread(ctx context.Context, threadID, agent string) ([]bus.Mess
 		threadID, agent, agent))
 }
 
-func (s *SQLite) ClaimInbox(ctx context.Context, agent, threadID string, limit int) ([]bus.Message, error) {
+// inboxWhere is the condition for messages a ClaimFilter may take. It uses the
+// messages alias m.
+func inboxWhere(f bus.ClaimFilter, now time.Time) (string, []any) {
+	q := ` m.recipient = ? AND (m.status = 'queued' OR (m.status = 'claimed' AND m.lease_until > 0 AND m.lease_until <= ?))`
+	args := []any{f.Agent, now.UnixMilli()}
+	if f.Thread != "" {
+		q += ` AND m.thread_id = ?`
+		args = append(args, f.Thread)
+	}
+	if f.Session != "" {
+		if f.Unpinned {
+			// Mail for a session that has gone falls to this one too.
+			q += ` AND (m.to_session = ? OR m.to_session = '' OR m.to_session NOT IN
+				(SELECT id FROM sessions WHERE agent = ? AND last_seen >= ?))`
+			args = append(args, f.Session, f.Agent, f.LiveSince.UnixMilli())
+		} else {
+			q += ` AND m.to_session = ?`
+			args = append(args, f.Session)
+		}
+	}
+	return q, args
+}
+
+func (s *SQLite) ClaimInbox(ctx context.Context, f bus.ClaimFilter, now time.Time) ([]bus.Message, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
-	q := `SELECT ` + msgCols + ` FROM messages m WHERE m.recipient = ? AND m.status = 'queued'`
-	args := []any{agent}
-	if threadID != "" {
-		q += ` AND m.thread_id = ?`
-		args = append(args, threadID)
-	}
-	q += ` ORDER BY m.seq LIMIT ?`
-	args = append(args, limit)
-	msgs, err := collectMessages(tx.QueryContext(ctx, q, args...))
+	where, args := inboxWhere(f, now)
+	msgs, err := collectMessages(tx.QueryContext(ctx,
+		`SELECT `+msgCols+` FROM messages m WHERE`+where+` ORDER BY m.seq LIMIT ?`, append(args, f.Limit)...))
 	if err != nil || len(msgs) == 0 {
 		return msgs, err
 	}
-	now := time.Now().UnixMilli()
 	for i := range msgs {
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE messages SET status = 'delivered', delivered_at = ? WHERE id = ?`, now, msgs[i].ID); err != nil {
+		if f.LeaseUntil.IsZero() {
+			_, err = tx.ExecContext(ctx, `UPDATE messages SET status = 'delivered', delivered_at = ? WHERE id = ?`, now.UnixMilli(), msgs[i].ID)
+			msgs[i].Status = bus.StatusDelivered
+		} else {
+			_, err = tx.ExecContext(ctx, `UPDATE messages SET status = 'claimed', lease_until = ? WHERE id = ?`, f.LeaseUntil.UnixMilli(), msgs[i].ID)
+			msgs[i].Status = bus.StatusClaimed
+		}
+		if err != nil {
 			return nil, err
 		}
-		msgs[i].Status = bus.StatusDelivered
 	}
 	return msgs, tx.Commit()
+}
+
+func (s *SQLite) CountInbox(ctx context.Context, f bus.ClaimFilter, now time.Time) (int, error) {
+	where, args := inboxWhere(f, now)
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM messages m WHERE`+where, args...).Scan(&n)
+	return n, err
+}
+
+func (s *SQLite) CountSent(ctx context.Context, from, to string, since time.Time) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM messages WHERE sender = ? AND recipient = ? AND created_at >= ?`, from, to, since.UnixMilli()).Scan(&n)
+	return n, err
 }
 
 func (s *SQLite) DueOutbound(ctx context.Context, now time.Time, limit int) ([]bus.Outbound, error) {
@@ -262,7 +336,7 @@ func (s *SQLite) DueOutbound(ctx context.Context, now time.Time, limit int) ([]b
 		var meta, cfg string
 		var mCreated, aCreated int64
 		m, a := &o.Message, &o.Agent
-		if err := rows.Scan(&m.ID, &m.ThreadID, &m.InReplyTo, &m.From, &m.To, &m.Content, &meta, &m.Status, &m.Attempts, &mCreated,
+		if err := rows.Scan(&m.ID, &m.ThreadID, &m.InReplyTo, &m.From, &m.To, &m.FromSession, &m.ToSession, &m.Content, &meta, &m.Status, &m.Attempts, &mCreated,
 			&a.Name, &a.TokenHash, &a.Delivery, &cfg, &aCreated); err != nil {
 			return nil, err
 		}
@@ -282,6 +356,76 @@ func (s *SQLite) MarkDelivered(ctx context.Context, id string, at time.Time) err
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE messages SET status = 'delivered', delivered_at = ?, last_error = '' WHERE id = ?`, at.UnixMilli(), id)
 	return err
+}
+
+func (s *SQLite) MarkClaimed(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE messages SET status = 'claimed', lease_until = 0, last_error = '' WHERE id = ?`, id)
+	return err
+}
+
+func (s *SQLite) Settle(ctx context.Context, id, agent string, ok bool, at time.Time) (bool, error) {
+	var res sql.Result
+	var err error
+	if ok {
+		res, err = s.db.ExecContext(ctx, `UPDATE messages SET status = 'delivered', delivered_at = ?, lease_until = 0
+			WHERE id = ? AND recipient = ? AND status = 'claimed'`, at.UnixMilli(), id, agent)
+	} else {
+		res, err = s.db.ExecContext(ctx, `UPDATE messages SET status = 'queued', lease_until = 0
+			WHERE id = ? AND recipient = ? AND status = 'claimed'`, id, agent)
+	}
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+func (s *SQLite) MarkReplied(ctx context.Context, id, agent string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE messages SET status = 'replied', lease_until = 0,
+		delivered_at = COALESCE(delivered_at, ?) WHERE id = ? AND recipient = ? AND status != 'failed'`, time.Now().UnixMilli(), id, agent)
+	return err
+}
+
+func (s *SQLite) ReleaseOutbound(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE messages SET status = 'queued', next_attempt_at = 0 WHERE status = 'claimed'
+		AND recipient IN (SELECT name FROM agents WHERE delivery != 'pull')`)
+	return err
+}
+
+func (s *SQLite) UpsertSession(ctx context.Context, ses bus.Session) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE last_seen < ?`, ses.LastSeen.Add(-sessionRetention).UnixMilli()); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO sessions (agent, id, name, cwd, tier, active_at, last_seen) VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(agent, id) DO UPDATE SET name = excluded.name, cwd = excluded.cwd, tier = excluded.tier,
+			active_at = MAX(active_at, excluded.active_at), last_seen = excluded.last_seen`,
+		ses.Agent, ses.ID, ses.Name, ses.Cwd, ses.Tier, ses.ActiveAt.UnixMilli(), ses.LastSeen.UnixMilli())
+	return err
+}
+
+func (s *SQLite) DeleteSession(ctx context.Context, agent, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE agent = ? AND id = ?`, agent, id)
+	return err
+}
+
+func (s *SQLite) LiveSessions(ctx context.Context, agent string, since time.Time) ([]bus.Session, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT agent, id, name, cwd, tier, active_at, last_seen FROM sessions
+		WHERE agent = ? AND last_seen >= ? ORDER BY active_at DESC, id`, agent, since.UnixMilli())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []bus.Session
+	for rows.Next() {
+		var ses bus.Session
+		var active, seen int64
+		if err := rows.Scan(&ses.Agent, &ses.ID, &ses.Name, &ses.Cwd, &ses.Tier, &active, &seen); err != nil {
+			return nil, err
+		}
+		ses.ActiveAt, ses.LastSeen = time.UnixMilli(active).UTC(), time.UnixMilli(seen).UTC()
+		out = append(out, ses)
+	}
+	return out, rows.Err()
 }
 
 func (s *SQLite) RecordFailure(ctx context.Context, id, errMsg string, next time.Time, failed bool) error {

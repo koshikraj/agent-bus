@@ -1,4 +1,4 @@
-// Package client is a Go client for the agent-bus HTTP API.
+// Package client is a Go client for the birdie HTTP API.
 package client
 
 import (
@@ -12,16 +12,39 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
-	"agentbus/internal/bus"
+	"birdie/internal/bus"
 )
+
+// Lease is how long a session keeps messages it claimed before confirming them.
+const Lease = 2 * time.Minute
 
 type Client struct {
 	BaseURL string
 	Token   string
 	HTTP    *http.Client
+
+	mu      sync.RWMutex
+	session string
+}
+
+// SetSession makes the client act for one session: its inbox is scoped to that
+// session, what it sends can be answered there, and messages it claims must be
+// confirmed with Ack.
+func (c *Client) SetSession(id string) {
+	c.mu.Lock()
+	c.session = id
+	c.mu.Unlock()
+}
+
+// Session returns the session the client acts for.
+func (c *Client) Session() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.session
 }
 
 func New(baseURL, token string) *Client {
@@ -33,7 +56,7 @@ type APIError struct {
 	Message string
 }
 
-func (e *APIError) Error() string { return fmt.Sprintf("agent-bus: %s (HTTP %d)", e.Message, e.Status) }
+func (e *APIError) Error() string { return fmt.Sprintf("%s (HTTP %d)", e.Message, e.Status) }
 
 func (c *Client) do(ctx context.Context, method, path string, body, out any) error {
 	var rd io.Reader
@@ -55,7 +78,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		if errors.Is(err, syscall.ECONNREFUSED) {
-			return fmt.Errorf("agent-bus daemon not reachable at %s (is `agent-bus serve` running?): %w", c.BaseURL, err)
+			return fmt.Errorf("birdie daemon not reachable at %s (is `birdie serve` running?): %w", c.BaseURL, err)
 		}
 		return err
 	}
@@ -85,6 +108,9 @@ func (c *Client) Agents(ctx context.Context) ([]bus.Agent, error) {
 }
 
 func (c *Client) Send(ctx context.Context, in bus.SendInput) (bus.Message, error) {
+	if in.FromSession == "" {
+		in.FromSession = c.Session()
+	}
 	var m bus.Message
 	return m, c.do(ctx, http.MethodPost, "/v1/messages", in, &m)
 }
@@ -97,6 +123,10 @@ func (c *Client) Inbox(ctx context.Context, threadID string, wait time.Duration)
 	if threadID != "" {
 		q.Set("thread_id", threadID)
 	}
+	if id := c.Session(); id != "" {
+		q.Set("session", id)
+		q.Set("lease", strconv.FormatFloat(Lease.Seconds(), 'f', -1, 64))
+	}
 	var out struct{ Messages []bus.Message }
 	return out.Messages, c.do(ctx, http.MethodGet, "/v1/inbox?"+q.Encode(), nil, &out)
 }
@@ -104,4 +134,34 @@ func (c *Client) Inbox(ctx context.Context, threadID string, wait time.Duration)
 func (c *Client) Thread(ctx context.Context, threadID string) ([]bus.Message, error) {
 	var out struct{ Messages []bus.Message }
 	return out.Messages, c.do(ctx, http.MethodGet, "/v1/threads/"+url.PathEscape(threadID), nil, &out)
+}
+
+// Ack confirms the agent got a claimed message.
+func (c *Client) Ack(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodPost, "/v1/messages/"+url.PathEscape(id)+"/ack", nil, nil)
+}
+
+// Nack returns a claimed message to the queue.
+func (c *Client) Nack(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodPost, "/v1/messages/"+url.PathEscape(id)+"/nack", nil, nil)
+}
+
+// Unread counts messages waiting for this client's session.
+func (c *Client) Unread(ctx context.Context) (int, error) {
+	var out struct{ Unread int }
+	path := "/v1/unread"
+	if id := c.Session(); id != "" {
+		path += "?session=" + url.QueryEscape(id)
+	}
+	return out.Unread, c.do(ctx, http.MethodGet, path, nil, &out)
+}
+
+// ReportSession tells the bus this session is running.
+func (c *Client) ReportSession(ctx context.Context, id string, in bus.SessionInput) error {
+	return c.do(ctx, http.MethodPut, "/v1/sessions/"+url.PathEscape(id), in, nil)
+}
+
+// EndSession tells the bus this session has stopped.
+func (c *Client) EndSession(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/v1/sessions/"+url.PathEscape(id), nil, nil)
 }

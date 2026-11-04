@@ -13,14 +13,14 @@ import (
 	"testing"
 	"time"
 
-	"agentbus/internal/adapter"
-	"agentbus/internal/bus"
-	"agentbus/internal/store"
+	"birdie/internal/adapter"
+	"birdie/internal/bus"
+	"birdie/internal/store"
 )
 
 // The test binary doubles as a fake ACP agent when this variable names a
 // directory to keep its sessions in.
-const fakeEnv = "AGENTBUS_FAKE_ACP_DIR"
+const fakeEnv = "BIRDIE_FAKE_ACP_DIR"
 
 func TestMain(m *testing.M) {
 	if dir := os.Getenv(fakeEnv); dir != "" {
@@ -194,8 +194,9 @@ func TestACPReplyLimit(t *testing.T) {
 	m, _ := b.Send(ctx, "alice", bus.SendInput{To: "grok", Content: "one"})
 	r := reply(t, b, ctx, m.ThreadID)
 	b.Send(ctx, "alice", bus.SendInput{To: "grok", Content: "two", InReplyTo: r.ID})
-	if got, _ := b.Receive(ctx, "alice", m.ThreadID, 3*time.Second); len(got) != 0 {
-		t.Fatalf("grok answered past its reply limit: %+v", got)
+	got, _ := b.Receive(ctx, "alice", m.ThreadID, 5*time.Second)
+	if len(got) != 1 || got[0].From != bus.SystemSender || !strings.Contains(got[0].Content, "limit") {
+		t.Fatalf("want a notice about the reply limit, got %+v", got)
 	}
 }
 

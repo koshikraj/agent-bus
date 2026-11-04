@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"agentbus/internal/adapter"
-	"agentbus/internal/bus"
-	"agentbus/internal/store"
+	"birdie/internal/adapter"
+	"birdie/internal/bus"
+	"birdie/internal/store"
 )
 
 func newBus(t *testing.T, ds ...bus.Deliverer) (*bus.Bus, *store.SQLite) {
@@ -160,7 +160,7 @@ func TestWebhookDelivery(t *testing.T) {
 		if h.body["task"] != "summarize repo" || h.body["context"] != "README.md" || h.body["wanted"] != "3 bullets" || h.body["source"] != "claude" {
 			t.Errorf("body = %v", h.body)
 		}
-		env := h.body["agent_bus"].(map[string]any)
+		env := h.body["birdie"].(map[string]any)
 		if env["message_id"] != m.ID || env["reply_to"] == nil {
 			t.Errorf("envelope = %v", env)
 		}

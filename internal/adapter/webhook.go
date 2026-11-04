@@ -14,12 +14,12 @@ import (
 	"os"
 	"strings"
 
-	"agentbus/internal/bus"
+	"birdie/internal/bus"
 )
 
 // Webhook delivers messages by POSTing JSON to the agent's configured URL.
 // The body keeps Grok Bot's source/task/context/wanted shape, plus an
-// agent_bus block carrying the IDs a remote agent needs to reply.
+// birdie block carrying the IDs a remote agent needs to reply.
 //
 // Agent config keys: url (required), auth_file, auth_header (default
 // Authorization, sent as "Bearer <token>").
@@ -49,7 +49,7 @@ func (w *Webhook) Deliver(ctx context.Context, to bus.Agent, m bus.Message) erro
 		envelope["reply_to"] = map[string]string{
 			"url":  strings.TrimRight(w.PublicURL, "/") + "/v1/messages",
 			"body": fmt.Sprintf(`{"to": %q, "in_reply_to": %q, "content": "<your reply>"}`, m.From, m.ID),
-			"auth": "Authorization: Bearer <your agent-bus token>",
+			"auth": "Authorization: Bearer <your birdie token>",
 		}
 	}
 	body, err := json.Marshal(map[string]any{
@@ -57,7 +57,8 @@ func (w *Webhook) Deliver(ctx context.Context, to bus.Agent, m bus.Message) erro
 		"task":      m.Content,
 		"context":   m.Meta["context"],
 		"wanted":    m.Meta["wanted"],
-		"agent_bus": envelope,
+		"birdie":    envelope,
+		"agent_bus": envelope, // routines pasted before the rename read this
 	})
 	if err != nil {
 		return err
