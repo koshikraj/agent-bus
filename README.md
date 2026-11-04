@@ -1,4 +1,4 @@
-# agent-bus
+# birdie
 
 Lets the AI agents on your machine talk to each other, in both directions.
 Ask Claude Code to "check with Grok Bot", have Grok Bot ask Claude to review a
@@ -9,88 +9,133 @@ service.
   Claude Code ──MCP──┐                         ┌──webhook──► Grok Bot
   Codex / Grok ──MCP─┤                         │
                      ▼                         │
-              agent-bus serve  (127.0.0.1:7777, SQLite)
+              birdie serve  (127.0.0.1:7777, SQLite)
                      ▲                         │
   Grok Bot ───HTTP───┘                         └──ACP──────► grok (headless)
 ```
 
 Every message has a verified sender, a thread, and an optional "reply to",
-so questions and answers stay paired.
+so questions and answers stay paired, and answers return to the session that
+asked.
+
+> **Name clash:** the unrelated Python package `birdie-agent` also installs a
+> command called `birdie`. If you have both, whichever comes first on your PATH
+> wins, so put this one first or remove the other.
 
 ## 1. Install
 
-You need [Go](https://go.dev/dl/) 1.27 or newer.
+On Linux or macOS:
 
 ```sh
-git clone https://github.com/koshikraj/agent-bus && cd agent-bus
-make install            # puts agent-bus in ~/.local/bin (make sure that's on your PATH)
+curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh
 ```
 
-## 2. Run the service
+This downloads the latest release to `~/.local/bin`, checks its checksum, and
+starts `birdie onboard`. It doesn't need Go or sudo. Add `-s -- --no-onboard`
+after `sh` to skip the guided setup, or `-s -- --version vX.Y.Z` to pick a version.
+
+To build from source instead, you need [Go](https://go.dev/dl/) 1.27 or newer:
 
 ```sh
-agent-bus serve         # listens on 127.0.0.1:7777; keep it running
+git clone https://github.com/koshikraj/birdie && cd birdie
+make install            # puts birdie in ~/.local/bin (make sure that's on your PATH)
+birdie onboard
 ```
 
-To start it automatically on Linux (systemd):
+If `make` says `go: not found`, add Go's `bin` folder to your PATH. On Windows,
+download the binary from the Releases page and run `birdie serve` yourself.
+
+## 2. Onboard
 
 ```sh
-cp deploy/agent-bus.service ~/.config/systemd/user/
-systemctl --user daemon-reload && systemctl --user enable --now agent-bus
+birdie onboard
 ```
 
-Restart the service after upgrading the binary.
+Nothing changes until you confirm. It walks through:
 
-## 3. Set up Claude Code
+1. **Background service:** keeps the bus running and starts it at login, using
+   systemd on Linux or launchd on macOS.
+2. **What to connect:** a checklist of Claude Code, Codex and Grok CLI if they're
+   on your PATH, plus headless Grok and Grok Bot, which start unticked.
+3. **Details:** a working folder for headless Grok, and Grok Bot's webhook URL and
+   key. Give the path to a file holding the key, or paste it; pasted keys aren't
+   shown, and are saved to `~/.config/grok-bot/sender-key`.
+4. **Changes:** everything it's about to do, for you to confirm.
+5. **Health check:** the same report as `birdie doctor`.
+
+You can run it again at any time. Agents that are connected start ticked, and
+unticking one disconnects it; that's listed with the changes before you confirm.
+Claude Code, Codex and Grok CLI keep their agent and token when disconnected.
+Headless Grok and Grok Bot lose theirs, so Grok Bot's routine would then need a
+new token.
+
+Changed files are backed up to `~/.config/birdie/backups`. Restart any open
+sessions afterwards.
+
+**In a script,** skip the questions:
 
 ```sh
-# Register Claude on the bus (its token is saved in ~/.config/agent-bus/tokens/claude)
-agent-bus agent add claude --description "Claude Code on this machine: code, repos, files"
-
-# Give every Claude session the tools to message other agents
-claude mcp add -s user agent-bus -- agent-bus mcp --as claude --channel
-
-# Optional: a skill that tells Claude (and the Grok CLI, which reads the same folder) when to use them
-mkdir -p ~/.claude/skills && cp -r skills/talk-to-agents ~/.claude/skills/
+birdie service install               # the background service
+birdie setup --all                   # every tool found on PATH
+birdie setup claude                  # or just one; add --as NAME, --remove or --dry-run
+birdie doctor                        # exits non-zero if something's broken
 ```
+
+## 3. How messages reach sessions
 
 Now any Claude session can do things like *"ask Grok Bot if I have meetings
-today"*; you don't have to mention agent-bus.
+today"*; you don't have to mention birdie.
 
-**Letting other agents wake Claude up.** So that Grok Bot (or anyone) can
-start a conversation with Claude, start one *listening* session:
+**Other agents can reach your open sessions too**, with no special flags. A
+message appears in the session on its own: at once if it's idle, or at its next
+tool call if it's busy.
+
+| A message is... | It goes to... |
+|---|---|
+| An answer | The session that asked |
+| Addressed to one session, `claude/api` | That session. It's named after its folder, or what you set with `/rename` |
+| A new conversation for `claude` | The default session: the most recently active one, unless you chose one |
 
 ```sh
-claude --dangerously-load-development-channels server:agent-bus
+birdie session list                  # who's running, and which is the default
+birdie session default claude api    # new conversations go to the session named api
+birdie session default claude        # back to the most recently active
 ```
 
-Pick "I am using this for local development" when asked. Messages to `claude`
-now appear in that session on their own, and Claude answers them. Other
-Claude sessions leave incoming messages alone: the `--channel` bridge only
-takes messages in a session started with that flag. Run one listening session
-at a time; with several, each message goes to one of them.
+If a session closes, its waiting messages go to the default session. If none is
+open, they wait for one.
 
-If you registered the server under a different name, pass it to the bridge
-too: `agent-bus mcp --as claude --channel --server-name NAME`.
+To keep one session from being interrupted, give its MCP server `--no-push`;
+messages then wait until it calls `check_inbox`.
 
-## 4. Set up Grok Bot
+A session that skips permission prompts holds incoming messages for you to
+review rather than acting on them. birdie leaves this in place on purpose.
+
+**How this works:** birdie posts to an inbox socket Claude Code keeps for each
+session. It has no public docs and could change. If it does, or on Windows, add
+`--channel` to the MCP server's command and start one session with
+`claude --dangerously-load-development-channels server:birdie`.
+
+## 4. Finish Grok Bot
+
+If you ticked Grok Bot, onboarding registers it and then lists the steps it can't
+do for you, in the routine's settings:
+
+- Add two secrets: `BIRDIE_URL` = `http://127.0.0.1:7777`, and
+  `BIRDIE_TOKEN` = the contents of `~/.config/birdie/tokens/grok-bot`.
+- Paste the routine text saved at `~/.config/birdie/grok-bot-routine.md`. It
+  covers starting conversations, answering messages, and not replying to answers
+  (so bots don't loop).
+
+Messages to `grok-bot` are POSTed to the webhook (retried if it's down). To add it
+without onboarding:
 
 ```sh
-agent-bus agent add grok-bot \
+birdie agent add grok-bot \
   --description "Grok Bot: personal assistant (email, calendar, web); answers in its own time" \
   --webhook https://api2.cursor.sh/automations/webhook/<your-webhook-id> \
   --auth-file ~/.config/grok-bot/sender-key
 ```
-
-- `--webhook` is the Grok Bot routine's webhook URL; `--auth-file` is a file
-  holding its secret key. Messages to `grok-bot` are POSTed there (retried if
-  it's down).
-- In the Grok Bot routine, add two secrets: `AGENT_BUS_URL` =
-  `http://127.0.0.1:7777`, and `AGENT_BUS_TOKEN` = the contents of
-  `~/.config/agent-bus/tokens/grok-bot`.
-- Paste the routine text from [docs/grok-bot-routine.md](docs/grok-bot-routine.md).
-  It covers starting conversations, answering messages, and not replying to
-  answers (so bots don't loop).
 
 ## 5. Try it
 
@@ -105,19 +150,19 @@ From Grok Bot's chat, with the listening Claude session running:
 Or from a terminal:
 
 ```sh
-agent-bus agent add me
-agent-bus send --as me --to claude "What's 12 × 12?"
-agent-bus inbox --as me --wait 60s
+birdie agent add me
+birdie send --as me --to claude "What's 12 × 12?"
+birdie inbox --as me --wait 60s
 ```
 
 ## Other agents
 
 **Grok CLI, answering headlessly (ACP).** No window needs to be open: for each
-message, agent-bus runs Grok, keeps one Grok session per thread, and posts its
+message, birdie runs Grok, keeps one Grok session per thread, and posts its
 answer back.
 
 ```sh
-agent-bus agent add grok --acp "grok agent stdio" --cwd ~/grok-work \
+birdie agent add grok --acp "grok agent stdio" --cwd ~/grok-work \
   --description "Grok CLI: coding questions and quick research"
 ```
 
@@ -131,57 +176,92 @@ agent-bus agent add grok --acp "grok agent stdio" --cwd ~/grok-work \
 Any agent that speaks the [Agent Client Protocol](https://agentclientprotocol.com)
 works the same way, e.g. Codex via `codex-acp` once installed.
 
-**Grok CLI or Codex, interactively (MCP).** Give an open session the same
-tools Claude has, under its own name:
+**Codex, interactively.** Messages wake an open session, once it has used an
+birdie tool at least once; that's how the bridge learns which conversation
+it's in. Until then they wait.
 
 ```sh
-agent-bus agent add grok-tui
-grok mcp add agent-bus agent-bus -- mcp --as grok-tui
-
-agent-bus agent add codex
-# ~/.codex/config.toml
-#   [mcp_servers.agent-bus]
-#   command = "agent-bus"
-#   args = ["mcp", "--as", "codex"]
-cp -r skills/talk-to-agents ~/.codex/skills/
+birdie setup codex
 ```
 
-These sessions can send and wait for answers, but can't be woken by an
-incoming message the way the listening Claude session can.
+**Grok CLI, interactively.** Messages appear at its next tool call or when it
+finishes a turn. Nothing can wake an idle Grok window, so the message waits for
+you to prompt it. Use the headless setup above if you need an answer with
+nothing open.
+
+```sh
+birdie setup grok    # registers it as grok-tui; choose another name with --as
+```
+
+**Any other MCP client.** Add `birdie mcp --as NAME` to its MCP servers after
+`birdie agent add NAME`. It can send and wait for answers, and its tool
+results mention when messages are waiting for `check_inbox`.
+
+## Upgrading from agent-bus
+
+This project used to be called agent-bus. To upgrade:
+
+1. Install `birdie` and run `birdie onboard`. Your data moves from
+   `~/.config/agent-bus` to `~/.config/birdie`, keeping your agents, tokens and
+   messages, and a link stays at the old path so anything still running keeps
+   working. Keep Claude Code, Codex and Grok CLI ticked: onboarding replaces their
+   old `agent-bus` entries.
+2. Stop the old `agent-bus serve`, start the bus from the new binary, and restart
+   open sessions. Their tools are now named `mcp__birdie__*`, so update any
+   permission rules that name `mcp__agent-bus__*`.
+3. In Grok Bot's routine, rename the secrets to `BIRDIE_URL` and `BIRDIE_TOKEN`,
+   and paste the new routine text from `docs/grok-bot-routine.md`. Your old routine
+   still receives messages, but it won't recognize notices from the bus.
+4. Delete `~/.local/bin/agent-bus` once nothing uses it.
 
 ## Commands
 
 ```
-agent-bus serve [--addr 127.0.0.1:7777]
-agent-bus agent add NAME [--description TEXT] [--webhook URL --auth-file PATH | --acp "COMMAND" ...]
-agent-bus agent describe NAME TEXT
-agent-bus agent list | rm NAME
-agent-bus send  --as NAME --to AGENT MESSAGE
-agent-bus reply --as NAME MSG_ID MESSAGE
-agent-bus inbox --as NAME [--wait 30s]
-agent-bus mcp   --as NAME [--channel [--server-name agent-bus]]
+birdie serve [--addr 127.0.0.1:7777] [--loop-limit 12]
+birdie onboard
+birdie doctor
+birdie setup claude|codex|grok|--all [--as NAME] [--remove] [--dry-run]
+birdie service install|remove|status
+birdie agent add NAME [--description TEXT] [--webhook URL --auth-file PATH | --acp "COMMAND" ...]
+birdie agent describe NAME TEXT
+birdie agent list | rm NAME
+birdie session list | default AGENT [NAME]
+birdie send  --as NAME --to AGENT[/SESSION] MESSAGE
+birdie reply --as NAME MSG_ID MESSAGE
+birdie inbox --as NAME [--wait 30s]
+birdie mcp   --as NAME [--no-push] [--channel [--server-name birdie]]
+birdie hook  grok post-tool-use|stop --as NAME
 ```
 
 MCP tools: `send_message`, `wait_for_reply`, `check_inbox`, `get_thread`,
 `list_agents`.
 
 HTTP API (Bearer token): `POST /v1/messages`, `GET /v1/inbox?wait=30s`,
-`GET /v1/threads/{id}`, `GET /v1/agents`, `GET /v1/me`.
+`GET /v1/unread`, `POST /v1/messages/{id}/ack|nack`, `GET /v1/threads/{id}`,
+`GET /v1/agents`, `GET /v1/me`, `PUT|DELETE /v1/sessions/{id}`.
+
+Pass `session` and `lease` to `/v1/inbox` to act as one session. Messages taken
+that way come back unless confirmed with `ack`.
 
 ## Troubleshooting
 
 | Problem | Check |
 |---|---|
-| `connection refused` | Is `agent-bus serve` running? |
-| Claude never wakes up | The listening session was started with `--dangerously-load-development-channels server:agent-bus`, and the server name matches your `claude mcp add` name |
-| Grok Bot gets nothing | `agent-bus agent list` shows `grok-bot` as `webhook`; the service log shows delivery errors |
+| `connection refused` | Is `birdie serve` running? |
+| A message went to the wrong session | `birdie session list` shows the default; choose one with `session default`, or address it as `agent/session` |
+| Claude never wakes up | `session list` shows it as `push`. If it shows `pull` or isn't listed, restart it. `claude -p` runs can't be woken |
+| Codex shows `pull` | It hasn't used a birdie tool yet; ask it to run `list_agents` |
+| Grok Bot gets nothing | `birdie agent list` shows `grok-bot` as `webhook`. After 8 failed tries the sender gets a notice from `birdie` saying why |
 | Headless Grok doesn't answer | The service log shows `acp: turn failed`; the sender also gets a reply explaining why |
+| `too many messages` | Two agents sent 12 messages in 10 minutes, which looks like a loop. Change it with `serve --loop-limit` (`0` = off) |
 
 ## Security
 
 - Listens on 127.0.0.1 only. Each agent has its own token; only a hash is stored.
 - The sender of every message is set by the bus from the token, so it can't be faked.
 - Only the agents in a thread can read it or post to it.
+- Agents are capped at 12 messages to the same agent in 10 minutes, so they
+  can't loop unnoticed.
 - Messages from other agents are treated as requests, not as your
   instructions: agents are told not to share secrets or personal information,
   or do anything destructive, without checking with you.
@@ -189,11 +269,11 @@ HTTP API (Bearer token): `POST /v1/messages`, `GET /v1/inbox?wait=30s`,
 ## How it fits together
 
 ```
-cmd/agent-bus       CLI
+cmd/birdie       CLI
 internal/bus        messages, threads, inboxes, delivery loop (no transport code)
 internal/store      SQLite storage
 internal/httpapi    HTTP API
-internal/mcpserver  MCP server (+ Claude Code channel push)
+internal/mcpserver  MCP server, and how each agent program is reached (Claude, Codex, Grok)
 internal/adapter    outbound delivery: webhook, ACP (A2A next)
 skills/             talk-to-agents skill for Claude, Grok and Codex
 docs/               Grok Bot routine
@@ -202,3 +282,9 @@ docs/               Grok Bot routine
 New protocols plug in as adapters: outbound ones implement `bus.Deliverer`
 (`Kind()` + `Deliver()`) and are picked by an agent's delivery kind; inbound
 ones call `Bus.Send` / `Bus.Receive`, as the HTTP and MCP servers do.
+
+**Beyond one machine.** birdie only connects agents on one machine today.
+Addresses are `agent[/session][@node]` so other machines can be added without
+changing existing names; `@node` is refused for now. Rules about who may message
+whom live in one place (`Bus.admit`), and a remote agent can be another
+`bus.Deliverer`.
