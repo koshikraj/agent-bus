@@ -6,19 +6,38 @@ set -eu
 
 REPO_URL="${BIRDIE_RELEASE_URL:-https://github.com/koshikraj/birdie/releases}"
 
+# A download with no data for this long counts as stalled and is retried.
+STALL_SECONDS=30
+RETRIES=3
+
 die() {
 	echo "birdie install: $*" >&2
 	exit 1
 }
 
+# download URL FILE [progress]. It runs in the background so that stopping the
+# installer can stop the download too.
 download() {
 	if command -v curl >/dev/null 2>&1; then
-		curl -fsSL "$1" -o "$2"
+		show=-sS
+		if [ "${3:-}" = progress ] && [ -t 2 ]; then
+			show=--progress-bar
+		fi
+		curl -fL "$show" --connect-timeout "$STALL_SECONDS" \
+			--speed-limit 1 --speed-time "$STALL_SECONDS" \
+			--retry "$RETRIES" --retry-delay 2 "$1" -o "$2" </dev/null &
 	elif command -v wget >/dev/null 2>&1; then
-		wget -q "$1" -O "$2"
+		wget -q -T "$STALL_SECONDS" -t "$((RETRIES + 1))" "$1" -O "$2" </dev/null &
 	else
 		die "needs curl or wget"
 	fi
+	child=$!
+	wait "$child"
+}
+
+stop() {
+	[ -z "${child:-}" ] || kill "$child" 2>/dev/null || true
+	exit "$1"
 }
 
 sha256() {
@@ -73,11 +92,13 @@ main() {
 	asset="birdie-$os-$arch"
 
 	tmp="$(mktemp -d)"
-	trap 'rm -rf "$tmp"' EXIT INT TERM
+	trap 'rm -rf "$tmp"' EXIT
+	trap 'stop 130' INT
+	trap 'stop 143' TERM
 
 	echo "Downloading $asset..."
-	download "$base/$asset" "$tmp/$asset" || die "couldn't download $base/$asset"
-	download "$base/checksums.txt" "$tmp/checksums.txt" || die "couldn't download checksums.txt"
+	download "$base/$asset" "$tmp/$asset" progress || die "couldn't download $base/$asset; check your connection and run this again"
+	download "$base/checksums.txt" "$tmp/checksums.txt" || die "couldn't download $base/checksums.txt; check your connection and run this again"
 
 	want="$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1 }' "$tmp/checksums.txt")"
 	[ -n "$want" ] || die "checksums.txt doesn't list $asset"
