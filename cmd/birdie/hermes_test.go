@@ -49,6 +49,8 @@ func TestSetupHermes(t *testing.T) {
 	os.MkdirAll(root, 0o700)
 	config := "# keep this\nmcp_servers:\n  other:\n    command: x\n  birdie:\n    command: y\n  agent-bus:\n    command: z\nmodel:\n  birdie:\n    no: match\n"
 	os.WriteFile(filepath.Join(root, "config.yaml"), []byte(config), 0o600)
+	envPath := filepath.Join(root, ".env")
+	os.WriteFile(envPath, []byte("# mine\nOTHER=1\n"+hermesTokenEnv+"=old\nLAST=2"), 0o644)
 
 	if err := setupOne(context.Background(), "hermes", o, false); err != nil {
 		t.Fatal(err)
@@ -58,14 +60,26 @@ func TestSetupHermes(t *testing.T) {
 		t.Fatal("plugin files weren't installed")
 	}
 	settings := read(t, filepath.Join(dir, "birdie.json"))
-	token := read(t, filepath.Join(tokenDir(), "hermes"))
-	if token == "" || strings.Contains(settings, strings.TrimSpace(token)) {
-		t.Fatalf("birdie.json must name the token file, not hold the token:\n%s", settings)
+	token := strings.TrimSpace(read(t, filepath.Join(tokenDir(), "hermes")))
+	if token == "" || strings.Contains(settings, token) || strings.Contains(settings, "token") {
+		t.Fatalf("birdie.json must not hold or point at the token:\n%s", settings)
 	}
-	if !strings.Contains(settings, filepath.Join(tokenDir(), "hermes")) || !strings.Contains(settings, defaultURL) {
+	if !strings.Contains(settings, defaultURL) {
 		t.Fatalf("settings:\n%s", settings)
 	}
+	if got, want := read(t, envPath), "# mine\nOTHER=1\n"+hermesTokenEnv+"="+token+"\nLAST=2\n"; got != want {
+		t.Errorf(".env keeps the rest and replaces the token:\n%s", got)
+	}
+	if fi, err := os.Stat(envPath); err != nil || fi.Mode().Perm() != 0o600 {
+		t.Errorf(".env mode: %v, %v", fi.Mode(), err)
+	}
 	got := read(t, calls)
+	if strings.Contains(got, token) {
+		t.Error("the token must not go on a command line")
+	}
+	if backups, _ := filepath.Glob(filepath.Join(configDir(), "backups", "*", "*env*")); len(backups) != 0 {
+		t.Errorf("a file of secrets was backed up: %v", backups)
+	}
 	for _, want := range []string{"mcp remove birdie", "mcp remove agent-bus", "plugins enable birdie", "tools list"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("calls lack %q:\n%s", want, got)
@@ -144,12 +158,72 @@ func TestSetupHermes(t *testing.T) {
 	if !exists(filepath.Join(tokenDir(), "hermes")) {
 		t.Error("the token should stay")
 	}
+	if got := read(t, envPath); got != "# mine\nOTHER=1\nLAST=2\n" {
+		t.Errorf("Hermes should lose its copy of the token and nothing else:\n%s", got)
+	}
 	os.Remove(calls)
 	if err := setupOne(context.Background(), "hermes", o, false); err != nil {
 		t.Fatal(err)
 	}
 	if read(t, calls) != "" {
 		t.Error("removing twice shouldn't run Hermes")
+	}
+}
+
+// A catalog install has Hermes's reviewed code, which setup must leave alone.
+func TestSetupHermesLeavesCatalogCodeToHermes(t *testing.T) {
+	o, calls := fakeHermes(t)
+	dir := filepath.Join(o.home, ".hermes", "plugins", "birdie")
+	os.MkdirAll(dir, 0o700)
+	marker := filepath.Join(dir, hermesCatalogMarker)
+	os.WriteFile(marker, []byte("{}"), 0o600)
+	code := filepath.Join(dir, "__init__.py")
+	os.WriteFile(code, []byte("# reviewed\n"), 0o600)
+
+	if err := setupOne(context.Background(), "hermes", o, false); err != nil {
+		t.Fatal(err)
+	}
+	if read(t, code) != "# reviewed\n" || exists(filepath.Join(dir, "plugin.yaml")) {
+		t.Error("setup changed Hermes's copy of the code")
+	}
+	if !exists(filepath.Join(dir, "birdie.json")) || !strings.Contains(read(t, calls), "plugins enable birdie") {
+		t.Error("setup should still connect it")
+	}
+
+	o.remove = true
+	if err := setupOne(context.Background(), "hermes", o, false); err != nil {
+		t.Fatal(err)
+	}
+	if read(t, code) != "# reviewed\n" || !exists(marker) {
+		t.Error("removing took Hermes's copy of the code")
+	}
+	if exists(filepath.Join(dir, "birdie.json")) {
+		t.Error("removing left birdie.json")
+	}
+	if _, ok := connectedAs("hermes", o.home); ok {
+		t.Error("still connected")
+	}
+}
+
+func TestSetEnvLine(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sub", ".env")
+	if err := setEnvLine(path, "K", ""); err != nil || exists(path) {
+		t.Fatalf("removing from no file: %v, exists %v", err, exists(path))
+	}
+	if err := setEnvLine(path, "K", "v"); err != nil || read(t, path) != "K=v\n" {
+		t.Fatalf("new file: %v, %q", err, read(t, path))
+	}
+	os.WriteFile(path, []byte("KEEP=1\nK=a\nK=b\nK2=c\n"), 0o600)
+	if err := setEnvLine(path, "K", "v"); err != nil || read(t, path) != "KEEP=1\nK=v\nK2=c\n" {
+		t.Fatalf("replace: %v, %q", err, read(t, path))
+	}
+	link := filepath.Join(t.TempDir(), ".env")
+	os.Symlink(path, link)
+	if err := setEnvLine(link, "K", ""); err != nil || read(t, path) != "KEEP=1\nK2=c\n" {
+		t.Fatalf("through a link: %v, %q", err, read(t, path))
+	}
+	if fi, err := os.Lstat(link); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Error("the symlink was replaced")
 	}
 }
 

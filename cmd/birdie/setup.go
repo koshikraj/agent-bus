@@ -425,13 +425,20 @@ func hermesHome(home string) string {
 	return base
 }
 
-// hermesSettings is what the Hermes plugin reads from birdie.json. It names the
-// token file rather than holding the token.
+// hermesTokenEnv is the Hermes secret holding the agent's token. The catalog's rules
+// say credentials come through Hermes, so the plugin doesn't read birdie's token files.
+// It isn't BIRDIE_TOKEN, which a birdie command started by Hermes would then pick up.
+const hermesTokenEnv = "BIRDIE_HERMES_TOKEN"
+
+// hermesCatalogMarker is in the plugin's folder when Hermes installed it from its
+// catalog. Hermes then owns the code, and updates it to a reviewed commit.
+const hermesCatalogMarker = ".hermes-catalog.json"
+
+// hermesSettings is what the Hermes plugin reads from birdie.json.
 type hermesSettings struct {
-	Agent     string `json:"agent"`
-	URL       string `json:"url"`
-	TokenFile string `json:"token_file"`
-	Wake      bool   `json:"wake"`
+	Agent string `json:"agent"`
+	URL   string `json:"url"`
+	Wake  bool   `json:"wake"`
 }
 
 func readHermesSettings(root string) (hermesSettings, bool) {
@@ -454,7 +461,12 @@ func setupHermes(r *setupRun) error {
 	dir := filepath.Join(root, "plugins", "birdie")
 	config := filepath.Join(root, "config.yaml")
 	current, installed := readHermesSettings(root)
+	env := filepath.Join(root, ".env")
 	files := map[string]string{"plugin.yaml": birdie.HermesManifest, "__init__.py": birdie.HermesPlugin}
+	code := []string{"plugin.yaml", "__init__.py"}
+	if pathExists(filepath.Join(dir, hermesCatalogMarker)) {
+		code = nil
+	}
 
 	if r.remove {
 		if !installed && !pathExists(dir) {
@@ -468,12 +480,20 @@ func setupHermes(r *setupRun) error {
 			hermesRun("plugins", "disable", "birdie") // fine if it wasn't enabled
 			hermesRun("config", "set", "plugins.entries.birdie.allow_gateway_injection", "false")
 		}
-		for _, name := range []string{"plugin.yaml", "__init__.py", "birdie.json"} {
+		r.say("remove %s from %s", hermesTokenEnv, env)
+		if !r.dry {
+			if err := setEnvLine(env, hermesTokenEnv, ""); err != nil {
+				return err
+			}
+		}
+		for _, name := range append(code, "birdie.json") {
 			if err := r.removeFile(filepath.Join(dir, name)); err != nil {
 				return err
 			}
 		}
-		if !r.dry {
+		if code == nil {
+			r.say("leave the plugin's code, which Hermes installed; remove it with: hermes plugins remove birdie")
+		} else if !r.dry {
 			os.RemoveAll(filepath.Join(dir, "__pycache__"))
 			os.Remove(dir) // only if empty
 		}
@@ -484,11 +504,11 @@ func setupHermes(r *setupRun) error {
 	if r.wake != nil {
 		wake = *r.wake
 	}
-	settings, err := json.MarshalIndent(hermesSettings{Agent: r.agent, URL: r.url, TokenFile: filepath.Join(tokenDir(), r.agent), Wake: wake}, "", "  ")
+	settings, err := json.MarshalIndent(hermesSettings{Agent: r.agent, URL: r.url, Wake: wake}, "", "  ")
 	if err != nil {
 		return err
 	}
-	for _, name := range []string{"plugin.yaml", "__init__.py"} {
+	for _, name := range code {
 		if err := r.write(filepath.Join(dir, name), files[name]); err != nil {
 			return err
 		}
@@ -497,6 +517,7 @@ func setupHermes(r *setupRun) error {
 		return err
 	}
 	servers := hermesMCPServers(config)
+	r.say("save the token of agent %s as %s in %s", r.agent, hermesTokenEnv, env)
 	r.say("enable the birdie plugin in Hermes")
 	for _, name := range servers {
 		r.say("remove the %s MCP server from Hermes, which the plugin replaces", name)
@@ -508,6 +529,13 @@ func setupHermes(r *setupRun) error {
 		return nil
 	}
 	if err := r.backup(config); err != nil {
+		return err
+	}
+	token, err := os.ReadFile(filepath.Join(tokenDir(), r.agent))
+	if err != nil {
+		return fmt.Errorf("read the token of agent %s: %w", r.agent, err)
+	}
+	if err := setEnvLine(env, hermesTokenEnv, strings.TrimSpace(string(token))); err != nil {
 		return err
 	}
 	for _, name := range servers {
@@ -527,6 +555,46 @@ func setupHermes(r *setupRun) error {
 	// its first conversation wouldn't have them.
 	hermesRun("tools", "list")
 	return nil
+}
+
+// setEnvLine sets KEY=value in a .env file, or removes the key when value is empty.
+// It doesn't use setupRun.write, which would copy a file of secrets to the backups.
+// It doesn't use `hermes config set` either, which would put the token on a command
+// line that other local users can read.
+func setEnvLine(path, key, value string) error {
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real // write through a symlinked dotfile rather than replacing the link
+	}
+	old, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	var b strings.Builder
+	want := key + "=" + value + "\n"
+	placed := value == ""
+	for line := range strings.Lines(string(old)) {
+		if !strings.HasPrefix(line, key+"=") {
+			b.WriteString(strings.TrimRight(line, "\r\n") + "\n")
+		} else if !placed {
+			b.WriteString(want)
+			placed = true
+		}
+	}
+	if !placed {
+		b.WriteString(want)
+	}
+	if b.String() == string(old) {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	tmp := path + ".birdie-tmp"
+	os.Remove(tmp) // so the mode below applies
+	if err := os.WriteFile(tmp, []byte(b.String()), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // hermesTimeout bounds each Hermes command, so a stuck Hermes can't hang setup.

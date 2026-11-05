@@ -1,8 +1,8 @@
 """birdie for Hermes: messaging between this conversation and other local agents.
 
-`birdie setup hermes` installs this next to a birdie.json naming the agent, the
-bus and the token file. The token stays in that file. Nothing here reads Hermes's
-credentials, or calls a model; a woken turn goes through Hermes's own input queue.
+`birdie setup hermes` connects this to the bus: it writes a birdie.json naming the
+agent and the bus, and saves the agent's token as a Hermes secret. Nothing here reads
+another credential or calls a model; a woken turn goes through Hermes's own input queue.
 """
 from __future__ import annotations
 
@@ -23,6 +23,9 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 CONFIG = Path(__file__).with_name("birdie.json")
+TOKEN_ENV = "BIRDIE_HERMES_TOKEN"
+NOT_SET_UP = ("birdie isn't set up yet. Run `birdie setup hermes`, then restart Hermes. "
+              "Get birdie from https://github.com/koshikraj/birdie")
 BEAT_SECONDS = 30  # the bus drops a session it hasn't heard from in 90
 POLL_SECONDS = 25
 LEASE_SECONDS = 120
@@ -49,18 +52,35 @@ def load_config():
     return json.loads(CONFIG.read_text(encoding="utf-8"))
 
 
+def read_token():
+    """Asks Hermes, so a gateway serving several profiles gives this profile's secret."""
+    try:
+        from agent.secret_scope import get_secret
+    except ImportError:
+        return os.environ.get(TOKEN_ENV, "")
+    return get_secret(TOKEN_ENV, "") or ""
+
+
 class Bus:
     """The birdie HTTP API, for one agent."""
 
-    def __init__(self, url, token_file):
+    def __init__(self, url):
         self.url = url.rstrip("/")
-        self.token_file = token_file
+        self.token = ""
+
+    def current_token(self):
+        """A gateway serving several profiles only has the secret during a turn, so
+        background threads use the one seen last."""
+        try:
+            self.token = read_token().strip() or self.token
+        except Exception:
+            log.debug("birdie: no secret scope on this thread", exc_info=True)
+        if not self.token:
+            raise BusError(NOT_SET_UP)
+        return self.token
 
     def call(self, method, path, body=None, timeout=10):
-        try:
-            token = Path(self.token_file).read_text(encoding="utf-8").strip()
-        except OSError:
-            raise BusError(f"can't read the birdie token file {self.token_file}") from None
+        token = self.current_token()
         data = None if body is None else json.dumps(body).encode("utf-8")
         request = urllib.request.Request(self.url + path, data=data, method=method, headers={
             "Authorization": "Bearer " + token, "Content-Type": "application/json",
@@ -151,7 +171,7 @@ class Network:
     def __init__(self, ctx, config):
         self.ctx = ctx
         self.agent = config["agent"]
-        self.bus = Bus(config["url"], config["token_file"])
+        self.bus = Bus(config["url"])
         self.lock = threading.Lock()
         self.conversations = {}
         self.sessions = {}  # Hermes session id -> conversation id
@@ -519,25 +539,32 @@ def hook_exists(name):
 
 
 def register(ctx):
+    # A catalog install runs before `birdie setup hermes`. It still registers everything,
+    # and its tools say what to do, so the model can tell the user.
     try:
-        config = load_config()
-        network = Network(ctx, config)
-    except (OSError, ValueError, KeyError) as err:
+        network = Network(ctx, load_config())
+    except (OSError, ValueError, KeyError, TypeError) as err:
         log.warning("birdie: can't read %s (%s); run `birdie setup hermes`", CONFIG, err)
-        return
-    if callable(getattr(ctx, "on_unload", None)):
+        network = None
+    if network and callable(getattr(ctx, "on_unload", None)):
         ctx.on_unload(network.close)
+
+    def idle(**_):
+        return None
+
     for name, callback in (
-        ("pre_llm_call", network.before_turn),
-        ("on_session_finalize", network.finalize),
-        ("on_session_reset", network.finalize),
-        ("post_compaction", network.compacted),
+        ("pre_llm_call", network.before_turn if network else idle),
+        ("on_session_finalize", network.finalize if network else idle),
+        ("on_session_reset", network.finalize if network else idle),
+        ("post_compaction", network.compacted if network else idle),
     ):
         if hook_exists(name):
             ctx.register_hook(name, callback)
 
     def handler(operation):
         def call(args, session_id=None, **_):
+            if network is None:
+                return json.dumps({"error": NOT_SET_UP})
             return network.tool(getattr(network, operation), args, session_id)
         return call
 

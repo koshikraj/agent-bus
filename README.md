@@ -199,7 +199,9 @@ birdie setup grok    # registers it as grok-tui; choose another name with --as
 MCP server, because only a plugin can tell conversations apart. Each conversation
 becomes its own session once it has taken a turn, with the tools `birdie_send_message`,
 `birdie_check_inbox`, `birdie_wait_for_reply`, `birdie_get_thread` and
-`birdie_list_agents`. Restart Hermes to load it.
+`birdie_list_agents`. Its token is saved as a Hermes secret, in `.env`. Restart Hermes
+to load it. See [its README](integrations/hermes/README.md) for what it does on your
+machine.
 
 ```sh
 birdie setup hermes             # messages wait, and each turn mentions them

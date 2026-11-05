@@ -8,6 +8,7 @@ import time
 import unittest
 import urllib.request
 from pathlib import Path
+from unittest import mock
 
 spec = importlib.util.spec_from_file_location("birdie_hermes", Path(__file__).with_name("__init__.py"))
 plugin = importlib.util.module_from_spec(spec)
@@ -18,6 +19,8 @@ plugin.WAIT_STEP_SECONDS = 0.2
 URL = os.environ["BIRDIE_TEST_URL"]
 TOKEN_FILE = os.environ["BIRDIE_TEST_TOKEN_FILE"]
 PEER_TOKEN = Path(os.environ["BIRDIE_TEST_PEER_TOKEN_FILE"]).read_text().strip()
+TOKEN = Path(TOKEN_FILE).read_text().strip()
+os.environ[plugin.TOKEN_ENV] = TOKEN
 
 
 def peer(method, path, body=None):
@@ -94,12 +97,12 @@ class PluginTest(unittest.TestCase):
         self.dir.cleanup()
 
     def drain(self):
-        bus = plugin.Bus(URL, TOKEN_FILE)
+        bus = plugin.Bus(URL)
         for message in bus.inbox(""):
             bus.ack(message["id"])
 
     def write_config(self, wake):
-        plugin.CONFIG.write_text(json.dumps({"agent": "hermes", "url": URL, "token_file": TOKEN_FILE, "wake": wake}))
+        plugin.CONFIG.write_text(json.dumps({"agent": "hermes", "url": URL, "wake": wake}))
 
     def load(self, **kwargs):
         ctx = Context(**kwargs)
@@ -307,27 +310,45 @@ class PluginTest(unittest.TestCase):
         self.assertEqual(self.sessions(), [])
 
     def test_a_broken_bus_never_breaks_a_turn_and_tools_say_why(self):
-        plugin.CONFIG.write_text(json.dumps({"agent": "hermes", "url": "http://127.0.0.1:1", "token_file": TOKEN_FILE}))
+        plugin.CONFIG.write_text(json.dumps({"agent": "hermes", "url": "http://127.0.0.1:1"}))
         ctx, _ = self.load()
         self.assertIsNone(self.turn(ctx))
         self.assertIn("birdie serve", json.loads(self.call(ctx, "birdie_list_agents"))["error"])
 
-    def test_missing_config_registers_nothing(self):
+    def test_before_setup_everything_registers_and_tools_say_what_to_do(self):
         plugin.CONFIG.unlink()
         ctx = Context()
         plugin.register(ctx)
-        self.assertEqual(ctx.tools, {})
-        self.assertEqual(ctx.hooks, {})
+        self.assertEqual({tool[0] for tool in plugin.TOOLS}, set(ctx.tools))
+        self.assertEqual({"pre_llm_call", "on_session_finalize", "on_session_reset", "post_compaction"}, set(ctx.hooks))
+        self.assertIsNone(self.turn(ctx))
+        self.assertIsNone(ctx.hooks["on_session_finalize"](session_id="s1"))
+        self.assertIn("birdie setup hermes", json.loads(self.call(ctx, "birdie_list_agents"))["error"])
+        self.assertEqual(self.sessions(), [])
+
+    def test_a_missing_token_says_what_to_do(self):
+        ctx, _ = self.load()
+        with mock.patch.dict(os.environ):
+            del os.environ[plugin.TOKEN_ENV]
+            self.assertIsNone(self.turn(ctx))
+            self.assertIn("birdie setup hermes", json.loads(self.call(ctx, "birdie_list_agents"))["error"])
+
+    def test_background_work_uses_the_token_from_the_last_turn(self):
+        ctx, network = self.load()
+        self.turn(ctx)
+        no_scope = RuntimeError("no profile secret scope on this thread")
+        with mock.patch.object(plugin, "read_token", side_effect=no_scope):
+            network.report(network.conversation("s1"))
+        self.assertEqual(len(self.sessions()), 1)
 
     def test_the_token_never_appears_in_tool_output(self):
-        token = Path(TOKEN_FILE).read_text().strip()
         ctx, _ = self.load()
         self.turn(ctx)
         for tool in ctx.tools:
             args = {"thread_id": "thr_x", "content": "c", "to": "nobody-here", "timeout_seconds": 0.1}
             if tool == "birdie_check_inbox":
                 args = {}
-            self.assertNotIn(token, self.call(ctx, tool, args))
+            self.assertNotIn(TOKEN, self.call(ctx, tool, args))
 
     def test_bad_arguments_are_reported_not_raised(self):
         ctx, _ = self.load()
