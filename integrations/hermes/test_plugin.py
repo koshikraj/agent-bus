@@ -222,12 +222,31 @@ class PluginTest(unittest.TestCase):
         self.write_config(True)
         ctx, _ = self.load()
         ctx.session_key = lambda: "route"
-        for platform, kwargs in (("cron", {}), ("subagent", {}), ("api_server", {}), ("cli", {"parent_session_id": "p"})):
+        for platform, kwargs in (("cron", {}), ("subagent", {}), ("api_server", {}), ("acp", {}), ("cli", {"parent_session_id": "p"})):
             self.turn(ctx, session="auto-" + platform, platform=platform, **kwargs)
         self.assertEqual(self.sessions(), [])
         peer("POST", "/v1/messages", {"to": "hermes", "content": "nobody here"})
         time.sleep(1.5)
         self.assertEqual(ctx.injected, [])
+
+    def test_runs_with_no_person_leave_a_conversations_mail_alone(self):
+        ctx, _ = self.load()
+        self.turn(ctx)
+        peer("POST", "/v1/messages", {"to": "hermes", "content": "for the conversation"})
+        for platform in ("cron", "subagent", "acp"):
+            session = "auto-" + platform
+            self.assertIsNone(self.turn(ctx, session=session, platform=platform), "must not point it at the inbox")
+            self.assertNotIn("unread", self.call(ctx, "birdie_list_agents", session=session))
+            self.assertNotIn("for the conversation", self.call(ctx, "birdie_check_inbox", session=session))
+        self.assertIn("for the conversation", self.call(ctx, "birdie_check_inbox"))
+
+    def test_a_run_with_no_person_can_still_wait_for_its_own_answer(self):
+        ctx, _ = self.load()
+        self.turn(ctx, session="auto", platform="cron")
+        sent = json.loads(self.call(ctx, "birdie_send_message", {"to": "peer", "content": "q"}, session="auto"))
+        peer("POST", "/v1/messages", {"in_reply_to": peer_inbox(5)[0]["id"], "content": "the answer"})
+        result = self.call(ctx, "birdie_wait_for_reply", {"thread_id": sent["thread_id"], "timeout_seconds": 5}, session="auto")
+        self.assertIn("the answer", result)
 
     def test_answers_go_back_to_the_conversation_that_asked(self):
         ctx, _ = self.load()

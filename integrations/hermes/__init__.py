@@ -32,9 +32,10 @@ MAX_REPLY_SECONDS = 600
 RETRY_SECONDS = 5
 TAG = "birdie-message"
 
-# Runs with no person in the conversation. They can use the tools, but aren't
-# sessions other agents can address, and are never woken.
-NOT_SESSIONS = {"subagent", "cron", "api", "api_server", "kanban", "webhook", "msgraph_webhook"}
+# Runs with no person in the conversation, or that birdie itself starts over ACP
+# for one message. They can send and wait for their own answers, but aren't
+# sessions other agents can address, have no inbox, and are never woken.
+NOT_SESSIONS = {"subagent", "cron", "api", "api_server", "kanban", "webhook", "msgraph_webhook", "acp"}
 WAKE_SURFACES = {"cli", "tui", "desktop", "telegram", "discord", "slack", "whatsapp", "signal", "matrix"}
 
 
@@ -258,11 +259,11 @@ class Network:
                 conversation.wake = self.can_wake(conversation, platform or "")
                 self.report(conversation)
                 self.start_threads(conversation)
-            if not conversation.wake:
-                count = self.bus.unread(self.session_of(conversation))
-                if count:
-                    # Only a count: a hook's result can be dropped, so mail is taken by the tool.
-                    lines.append(f"You have {count} unread birdie message(s). Call birdie_check_inbox to read them.")
+                if not conversation.wake:
+                    count = self.bus.unread(conversation.id)
+                    if count:
+                        # Only a count: a hook's result can be dropped, so mail is taken by the tool.
+                        lines.append(f"You have {count} unread birdie message(s). Call birdie_check_inbox to read them.")
             return {"context": "\n".join(lines)} if lines else None
         except Exception as err:
             log.debug("birdie unavailable: %s", err)
@@ -400,10 +401,10 @@ class Network:
                 conversation.waiting.pop(thread, None)
 
     def unread_note(self, conversation):
-        if conversation.wake:
+        if conversation.wake or not conversation.is_session:
             return ""
         try:
-            count = self.bus.unread(self.session_of(conversation))
+            count = self.bus.unread(conversation.id)
         except BusError:
             return ""
         return f"\n\n({count} unread birdie message(s) waiting; call birdie_check_inbox.)" if count else ""
@@ -438,6 +439,11 @@ class Network:
         return json.dumps(result, ensure_ascii=False) + self.unread_note(conversation)
 
     def check_inbox(self, conversation, args):
+        # With no session, the bus would hand over all of this agent's mail, including
+        # messages for a conversation someone is in.
+        if not conversation.is_session:
+            return ("This run has no inbox: new messages go to your user's conversations. "
+                    "For the answer to a message you sent, use birdie_wait_for_reply.")
         if conversation.wake:
             return "New messages come to you on their own in this conversation, so there is nothing to fetch."
         wait = max(0, min(float(args.get("wait_seconds") or 0), MAX_CHECK_SECONDS))

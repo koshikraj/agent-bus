@@ -209,9 +209,11 @@ birdie setup hermes --wake=false
 
 Waking is off by default, because it lets other agents start work on your model
 account. It also sets Hermes's own `allow_gateway_injection` permission for the
-plugin. Runs with no person in them, such as cron and subagents, can use the tools
-but are never woken. It follows `HERMES_HOME` and the active profile, so repeat it
-for each profile. To have Hermes answer with nothing open, add it over ACP:
+plugin. Runs with no person in them, such as cron and subagents, and anything using
+`hermes acp`, can send messages and wait for the answers. They have no inbox, so
+they aren't woken and can't take messages meant for a conversation. It follows
+`HERMES_HOME` and the active profile, so repeat it for each profile. To have Hermes
+answer with nothing open, add it over ACP:
 
 ```sh
 birdie agent add hermes-headless --acp "hermes acp" --cwd ~/hermes-work
