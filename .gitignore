@@ -7,3 +7,4 @@
 .env.*
 *.swp
 /.local/
+__pycache__/

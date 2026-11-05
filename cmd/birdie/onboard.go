@@ -19,13 +19,31 @@ import (
 )
 
 const (
-	itemHeadless = "grok-headless"
-	itemBot      = "grok-bot"
+	itemHeadless       = "grok-headless"
+	itemHermesHeadless = "hermes-headless"
+	itemBot            = "grok-bot"
 
-	headlessAgent   = "grok"
-	headlessCommand = "grok agent stdio"
-	botAgent        = "grok-bot"
+	botAgent = "grok-bot"
 )
+
+// headlessAgent is an agent birdie starts for each message, over ACP.
+type headlessAgent struct {
+	key, label, tool, agent, command, folder, description string
+}
+
+var headlessAgents = []headlessAgent{
+	{itemHeadless, "Grok CLI (headless)", "grok", "grok", "grok agent stdio", "grok-work", "Grok CLI: coding questions and quick research"},
+	{itemHermesHeadless, "Hermes (headless)", "hermes", "hermes-headless", "hermes acp", "hermes-work", "Hermes Agent: answers with nothing open"},
+}
+
+func headlessFor(key string) (headlessAgent, bool) {
+	for _, h := range headlessAgents {
+		if h.key == key {
+			return h, true
+		}
+	}
+	return headlessAgent{}, false
+}
 
 // wizardItem is one row of the onboarding checklist.
 type wizardItem struct {
@@ -46,7 +64,8 @@ type wizardPlan struct {
 	service             bool
 	connect, disconnect []*wizardItem
 	bot                 *botDetails
-	headlessCwd         string
+	headlessCwd         map[string]string
+	hermesWake          *bool
 }
 
 func (p wizardPlan) empty() bool {
@@ -91,7 +110,7 @@ func (w *wizard) run() error {
 	fmt.Fprintln(w.out, "Let's connect your agents to birdie. Nothing changes until you confirm.")
 	fmt.Fprintln(w.out)
 
-	var plan wizardPlan
+	plan := wizardPlan{headlessCwd: map[string]string{}}
 	var err error
 	if plan.service, err = w.askService(); err != nil {
 		return err
@@ -195,12 +214,14 @@ func (w *wizard) items() ([]*wizardItem, []string, error) {
 		a, err := st.GetAgent(w.ctx, name)
 		return err == nil && a.Delivery == delivery
 	}
-	if connected := has(headlessAgent, "acp"); onPath["grok"] || connected {
-		it := &wizardItem{key: itemHeadless, label: "Grok CLI (headless)", agent: headlessAgent, ticked: connected, connected: connected, note: "answers with nothing open"}
-		if connected {
-			it.note = "connected as " + headlessAgent
+	for _, h := range headlessAgents {
+		if connected := has(h.agent, "acp"); onPath[h.tool] || connected {
+			it := &wizardItem{key: h.key, label: h.label, agent: h.agent, ticked: connected, connected: connected, note: "answers with nothing open"}
+			if connected {
+				it.note = "connected as " + h.agent
+			}
+			items = append(items, it)
 		}
-		items = append(items, it)
 	}
 	connected := has(botAgent, "webhook")
 	it := &wizardItem{key: itemBot, label: "Grok Bot", agent: botAgent, ticked: connected, connected: connected, note: "needs its webhook URL and key"}
@@ -217,17 +238,27 @@ func (w *wizard) askDetails(plan *wizardPlan, items []*wizardItem) error {
 		if !it.ticked {
 			continue
 		}
-		switch it.key {
-		case itemHeadless:
+		if h, ok := headlessFor(it.key); ok {
 			if it.connected {
 				continue
 			}
-			fmt.Fprintln(w.out, "\nGrok CLI (headless)")
-			dir, err := w.p.line("Folder it works in", filepath.Join(w.o.home, "grok-work"))
+			fmt.Fprintf(w.out, "\n%s\n", h.label)
+			dir, err := w.p.line("Folder it works in", filepath.Join(w.o.home, h.folder))
 			if err != nil {
 				return err
 			}
-			plan.headlessCwd = expandHome(dir, w.o.home)
+			plan.headlessCwd[h.key] = expandHome(dir, w.o.home)
+			continue
+		}
+		switch it.key {
+		case "hermes":
+			current, _ := readHermesSettings(hermesHome(w.o.home))
+			fmt.Fprintln(w.out, "\nHermes")
+			wake, err := w.p.confirm("Let other agents' messages start turns in Hermes on their own? That uses your model account", current.Wake)
+			if err != nil {
+				return err
+			}
+			plan.hermesWake = &wake
 		case itemBot:
 			fmt.Fprintln(w.out, "\nGrok Bot")
 			if it.connected {
@@ -323,9 +354,12 @@ func expandHome(path, home string) string {
 
 func routinePath() string { return filepath.Join(configDir(), "grok-bot-routine.md") }
 
-func (w *wizard) toolOptions(it *wizardItem, remove bool) setupOptions {
+func (w *wizard) toolOptions(it *wizardItem, plan wizardPlan, remove bool) setupOptions {
 	o := w.o
 	o.as, o.remove, o.quiet = it.agent, remove, true
+	if it.key == "hermes" {
+		o.wake = plan.hermesWake
+	}
 	return o
 }
 
@@ -336,9 +370,11 @@ func (w *wizard) preview(plan wizardPlan) {
 	}
 	for _, it := range plan.connect {
 		fmt.Fprintf(w.out, "\n%s:\n", it.label)
+		if h, ok := headlessFor(it.key); ok {
+			fmt.Fprintf(w.out, "would add agent %s, running `%s` in %s\n", h.agent, h.command, plan.headlessCwd[h.key])
+			continue
+		}
 		switch it.key {
-		case itemHeadless:
-			fmt.Fprintf(w.out, "would add agent %s, running `%s` in %s\n", headlessAgent, headlessCommand, plan.headlessCwd)
 		case itemBot:
 			verb := "add agent"
 			if it.connected {
@@ -352,20 +388,22 @@ func (w *wizard) preview(plan wizardPlan) {
 			}
 			fmt.Fprintf(w.out, "would save the routine text to %s\n", routinePath())
 		default:
-			if err := setupOne(w.ctx, it.key, w.toolOptions(it, false), true); err != nil {
+			if err := setupOne(w.ctx, it.key, w.toolOptions(it, plan, false), true); err != nil {
 				fmt.Fprintf(w.out, "can't preview: %v\n", err)
 			}
 		}
 	}
 	for _, it := range plan.disconnect {
 		fmt.Fprintf(w.out, "\n%s (unticked):\n", it.label)
+		if h, ok := headlessFor(it.key); ok {
+			fmt.Fprintf(w.out, "would delete agent %s and its token\n", h.agent)
+			continue
+		}
 		switch it.key {
-		case itemHeadless:
-			fmt.Fprintf(w.out, "would delete agent %s and its token\n", headlessAgent)
 		case itemBot:
 			fmt.Fprintf(w.out, "would delete agent %s and its token; its routine would need a new token if you reconnect\n", botAgent)
 		default:
-			if err := setupOne(w.ctx, it.key, w.toolOptions(it, true), true); err != nil {
+			if err := setupOne(w.ctx, it.key, w.toolOptions(it, plan, true), true); err != nil {
 				fmt.Fprintf(w.out, "can't preview: %v\n", err)
 			}
 		}
@@ -383,20 +421,22 @@ func (w *wizard) apply(plan wizardPlan) (failed []string) {
 	}
 	for _, it := range plan.disconnect {
 		switch it.key {
-		case itemHeadless, itemBot:
+		case itemHeadless, itemHermesHeadless, itemBot:
 			step(it.label, func() error { return w.deleteAgent(it.agent) })
 		default:
-			step(it.label, func() error { return setupOne(w.ctx, it.key, w.toolOptions(it, true), false) })
+			step(it.label, func() error { return setupOne(w.ctx, it.key, w.toolOptions(it, plan, true), false) })
 		}
 	}
 	for _, it := range plan.connect {
+		if h, ok := headlessFor(it.key); ok {
+			step(it.label, func() error { return w.addHeadless(h, plan.headlessCwd[h.key]) })
+			continue
+		}
 		switch it.key {
-		case itemHeadless:
-			step(it.label, func() error { return w.addHeadless(plan.headlessCwd) })
 		case itemBot:
 			step(it.label, func() error { return w.applyBot(*plan.bot, it.connected) })
 		default:
-			step(it.label, func() error { return setupOne(w.ctx, it.key, w.toolOptions(it, false), false) })
+			step(it.label, func() error { return setupOne(w.ctx, it.key, w.toolOptions(it, plan, false), false) })
 		}
 	}
 	if plan.service {
@@ -430,8 +470,8 @@ func (w *wizard) deleteAgent(name string) error {
 	return nil
 }
 
-func (w *wizard) addHeadless(cwd string) error {
-	argv := strings.Fields(headlessCommand)
+func (w *wizard) addHeadless(h headlessAgent, cwd string) error {
+	argv := strings.Fields(h.command)
 	if _, err := exec.LookPath(argv[0]); err != nil {
 		return err
 	}
@@ -448,16 +488,16 @@ func (w *wizard) addHeadless(cwd string) error {
 	}
 	defer st.Close()
 	err = createAgent(w.ctx, st, bus.Agent{
-		Name: headlessAgent, Delivery: "acp", CreatedAt: time.Now().UTC(),
+		Name: h.agent, Delivery: "acp", CreatedAt: time.Now().UTC(),
 		Config: map[string]string{
-			"command": headlessCommand, "permission": "reject", "cwd": abs,
-			"description": "Grok CLI: coding questions and quick research",
+			"command": h.command, "permission": "reject", "cwd": abs,
+			"description": h.description,
 		},
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(w.out, "added agent %s\n", headlessAgent)
+	fmt.Fprintf(w.out, "added agent %s\n", h.agent)
 	return nil
 }
 
@@ -505,6 +545,12 @@ func (w *wizard) nextSteps(plan wizardPlan) {
 	for _, it := range plan.connect {
 		if _, isTool := setupTools[it.key]; isTool {
 			steps = append(steps, "Restart any open sessions of the tools you connected.")
+			break
+		}
+	}
+	for _, it := range append(plan.connect[:len(plan.connect):len(plan.connect)], plan.disconnect...) {
+		if it.key == "hermes" {
+			steps = append(steps, "Restart Hermes to load the change: hermes gateway restart.")
 			break
 		}
 	}

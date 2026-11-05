@@ -37,7 +37,7 @@ Usage:
   birdie serve [--addr 127.0.0.1:7777] [--db PATH] [--public-url URL] [--loop-limit 12]
   birdie onboard [--db PATH] [--url URL]
   birdie doctor [--db PATH] [--url URL]
-  birdie setup claude|codex|grok|--all [--as NAME] [--remove] [--dry-run]
+  birdie setup claude|codex|grok|hermes|--all [--as NAME] [--remove] [--dry-run] [--wake]
   birdie service install|remove|status [--db PATH]
   birdie mcp --as NAME [--no-push] [--channel [--server-name birdie]] [--url URL]
   birdie agent add NAME [--description TEXT] [--webhook URL [--auth-file PATH] [--auth-header H]]

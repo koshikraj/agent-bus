@@ -55,9 +55,11 @@ Nothing changes until you confirm. It walks through:
 
 1. **Background service:** keeps the bus running and starts it at login, using
    systemd on Linux or launchd on macOS.
-2. **What to connect:** a checklist of Claude Code, Codex and Grok CLI if they're
-   on your PATH, plus headless Grok and Grok Bot, which start unticked.
-3. **Details:** a working folder for headless Grok, and Grok Bot's webhook URL and
+2. **What to connect:** a checklist of Claude Code, Codex, Grok CLI and Hermes if
+   they're on your PATH, plus headless Grok, headless Hermes and Grok Bot, which
+   start unticked.
+3. **Details:** whether messages may wake Hermes, a working folder for each
+   headless agent, and Grok Bot's webhook URL and
    key. Give the path to a file holding the key, or paste it; pasted keys aren't
    shown, and are saved to `~/.config/grok-bot/sender-key`.
 4. **Changes:** everything it's about to do, for you to confirm.
@@ -65,8 +67,8 @@ Nothing changes until you confirm. It walks through:
 
 You can run it again at any time. Agents that are connected start ticked, and
 unticking one disconnects it; that's listed with the changes before you confirm.
-Claude Code, Codex and Grok CLI keep their agent and token when disconnected.
-Headless Grok and Grok Bot lose theirs, so Grok Bot's routine would then need a
+Claude Code, Codex, Grok CLI and Hermes keep their agent and token when
+disconnected. Headless agents and Grok Bot lose theirs, so Grok Bot's routine would then need a
 new token.
 
 Changed files are backed up to `~/.config/birdie/backups`. Restart any open
@@ -193,6 +195,28 @@ nothing open.
 birdie setup grok    # registers it as grok-tui; choose another name with --as
 ```
 
+**Hermes.** `birdie setup hermes` installs a native Hermes plugin instead of an
+MCP server, because only a plugin can tell conversations apart. Each conversation
+becomes its own session once it has taken a turn, with the tools `birdie_send_message`,
+`birdie_check_inbox`, `birdie_wait_for_reply`, `birdie_get_thread` and
+`birdie_list_agents`. Restart Hermes to load it.
+
+```sh
+birdie setup hermes             # messages wait, and each turn mentions them
+birdie setup hermes --wake      # messages also start a turn on their own
+birdie setup hermes --wake=false
+```
+
+Waking is off by default, because it lets other agents start work on your model
+account. It also sets Hermes's own `allow_gateway_injection` permission for the
+plugin. Runs with no person in them, such as cron and subagents, can use the tools
+but are never woken. It follows `HERMES_HOME` and the active profile, so repeat it
+for each profile. To have Hermes answer with nothing open, add it over ACP:
+
+```sh
+birdie agent add hermes-headless --acp "hermes acp" --cwd ~/hermes-work
+```
+
 **Any other MCP client.** Add `birdie mcp --as NAME` to its MCP servers after
 `birdie agent add NAME`. It can send and wait for answers, and its tool
 results mention when messages are waiting for `check_inbox`.
@@ -220,7 +244,7 @@ This project used to be called agent-bus. To upgrade:
 birdie serve [--addr 127.0.0.1:7777] [--loop-limit 12]
 birdie onboard
 birdie doctor
-birdie setup claude|codex|grok|--all [--as NAME] [--remove] [--dry-run]
+birdie setup claude|codex|grok|hermes|--all [--as NAME] [--remove] [--dry-run] [--wake]
 birdie service install|remove|status
 birdie agent add NAME [--description TEXT] [--webhook URL --auth-file PATH | --acp "COMMAND" ...]
 birdie agent describe NAME TEXT

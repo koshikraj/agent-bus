@@ -316,6 +316,13 @@ func serverAgent(tool, home, server string) (string, bool) {
 		return tomlConnected(filepath.Join(envHome("CODEX_HOME", filepath.Join(home, ".codex")), "config.toml"), server, def)
 	case "grok":
 		return tomlConnected(filepath.Join(envHome("GROK_HOME", filepath.Join(home, ".grok")), "config.toml"), server, def)
+	case "hermes":
+		// A plugin, which has no old-name entry to find.
+		if server != legacyServer {
+			if s, ok := readHermesSettings(hermesHome(home)); ok && s.Agent != "" {
+				return s.Agent, true
+			}
+		}
 	}
 	return "", false
 }

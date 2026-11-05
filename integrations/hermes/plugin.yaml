@@ -1,0 +1,15 @@
+name: birdie
+version: "0.1.0"
+description: "Give each Hermes conversation a session on birdie, so it can message other AI agents on this machine and, if you allow it, be woken by them."
+author: "Koshik Raj"
+provides_tools:
+  - birdie_list_agents
+  - birdie_send_message
+  - birdie_check_inbox
+  - birdie_wait_for_reply
+  - birdie_get_thread
+provides_hooks:
+  - pre_llm_call
+  - on_session_finalize
+  - on_session_reset
+  - post_compaction

@@ -35,11 +35,12 @@ var setupTools = map[string]setupTool{
 	"claude": {"Claude Code", "claude", "Claude Code on this machine: code, repos, files", setupClaude},
 	"codex":  {"Codex", "codex", "Codex on this machine: code, repos, files", setupCodex},
 	"grok":   {"Grok CLI", "grok-tui", "Grok CLI on this machine: coding questions and quick research", setupGrok},
+	"hermes": {"Hermes", "hermes", "Hermes Agent on this machine", setupHermes},
 }
 
 // setupOrder is the order tools are listed in. Each name is also the command
 // looked for on PATH.
-var setupOrder = []string{"claude", "codex", "grok"}
+var setupOrder = []string{"claude", "codex", "grok", "hermes"}
 
 // setupRun carries one setup and records what it changed.
 type setupRun struct {
@@ -48,6 +49,9 @@ type setupRun struct {
 	dry        bool
 	stamp      string
 	home       string
+	db         string
+	url        string
+	wake       *bool // Hermes only; nil keeps the current setting
 	said       int
 }
 
@@ -55,6 +59,7 @@ type setupRun struct {
 type setupOptions struct {
 	as, db, exe, home, stamp string
 	remove, dry              bool
+	wake                     *bool
 	quiet                    bool // leave closing advice to the caller
 }
 
@@ -64,24 +69,33 @@ func setup(ctx context.Context, args []string) error {
 	remove := fs.Bool("remove", false, "undo the setup; the agent and its token stay")
 	dry := fs.Bool("dry-run", false, "print what would change")
 	all := fs.Bool("all", false, "set up every tool found on PATH, without asking")
+	wake := fs.Bool("wake", false, "Hermes only: let other agents' messages start turns on their own; --wake=false turns that off")
 	db := fs.String("db", defaultDB(), "SQLite database path")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) > 1 || (len(pos) == 0) != *all {
-		return errors.New("usage: birdie setup claude|codex|grok|--all [--as NAME] [--remove] [--dry-run]\nFor a guided setup, run: birdie onboard")
+		return errors.New("usage: birdie setup claude|codex|grok|hermes|--all [--as NAME] [--remove] [--dry-run] [--wake]\nFor a guided setup, run: birdie onboard")
 	}
 	o, err := newSetupOptions(*db)
 	if err != nil {
 		return err
 	}
 	o.as, o.remove, o.dry = *as, *remove, *dry
+	var wakeSet bool
+	fs.Visit(func(f *flag.Flag) { wakeSet = wakeSet || f.Name == "wake" })
+	if wakeSet {
+		if len(pos) != 1 || pos[0] != "hermes" {
+			return errors.New("--wake only applies to: birdie setup hermes")
+		}
+		o.wake = wake
+	}
 	if *all {
 		return setupAll(ctx, o, os.Stdout)
 	}
 	if _, ok := setupTools[pos[0]]; !ok {
-		return fmt.Errorf("can't set up %q; choose claude, codex or grok", pos[0])
+		return fmt.Errorf("can't set up %q; choose claude, codex, grok or hermes", pos[0])
 	}
 	return setupOne(ctx, pos[0], o, o.dry)
 }
@@ -101,7 +115,7 @@ func newSetupOptions(db string) (setupOptions, error) {
 // setupOne applies or previews the setup of one tool.
 func setupOne(ctx context.Context, name string, o setupOptions, dry bool) error {
 	tool := setupTools[name]
-	r := &setupRun{exe: o.exe, agent: tool.agent, remove: o.remove, dry: dry, stamp: o.stamp, home: o.home}
+	r := &setupRun{exe: o.exe, agent: tool.agent, remove: o.remove, dry: dry, stamp: o.stamp, home: o.home, db: o.db, url: envOr("BIRDIE_URL", defaultURL), wake: o.wake}
 	if o.as != "" {
 		r.agent = o.as
 	} else if agent, ok := connectedAs(name, o.home); ok {
@@ -124,7 +138,11 @@ func setupOne(ctx context.Context, name string, o setupOptions, dry bool) error 
 	case o.remove:
 		fmt.Printf("removed. The agent %s and its token stay; remove them with: birdie agent rm %s\n", r.agent, r.agent)
 	default:
-		fmt.Printf("done. Restart any open %s sessions, and keep `birdie serve` running.\n", name)
+		if name == "hermes" {
+			fmt.Println("done. To load it, restart Hermes with: hermes gateway restart. Keep `birdie serve` running.")
+		} else {
+			fmt.Printf("done. Restart any open %s sessions, and keep `birdie serve` running.\n", name)
+		}
 	}
 	return nil
 }
@@ -388,6 +406,177 @@ func setupGrok(r *setupRun) error {
 		return err
 	}
 	return r.write(path, content)
+}
+
+// hermesHome is the Hermes profile setup applies to.
+func hermesHome(home string) string {
+	base := envHome("HERMES_HOME", "")
+	if base != "" {
+		return base
+	}
+	base = filepath.Join(home, ".hermes")
+	b, err := os.ReadFile(filepath.Join(base, "active_profile"))
+	active := strings.TrimSpace(string(b))
+	if err == nil && active != "" && active != "default" && active != "." && active != ".." && !strings.ContainsAny(active, `/\\`) {
+		if fi, err := os.Stat(filepath.Join(base, "profiles", active)); err == nil && fi.IsDir() {
+			return filepath.Join(base, "profiles", active)
+		}
+	}
+	return base
+}
+
+// hermesSettings is what the Hermes plugin reads from birdie.json. It names the
+// token file rather than holding the token.
+type hermesSettings struct {
+	Agent     string `json:"agent"`
+	URL       string `json:"url"`
+	TokenFile string `json:"token_file"`
+	Wake      bool   `json:"wake"`
+}
+
+func readHermesSettings(root string) (hermesSettings, bool) {
+	var s hermesSettings
+	b, err := os.ReadFile(filepath.Join(root, "plugins", "birdie", "birdie.json"))
+	if err != nil || json.Unmarshal(b, &s) != nil {
+		return s, false
+	}
+	return s, true
+}
+
+// setupHermes installs a native plugin rather than an MCP server: only a plugin
+// knows which conversation it's in, and can start a turn in it. Hermes's own
+// commands change its config, so its comments and formatting survive.
+func setupHermes(r *setupRun) error {
+	if _, err := exec.LookPath("hermes"); err != nil {
+		return fmt.Errorf("the hermes command isn't on PATH: %w", err)
+	}
+	root := hermesHome(r.home)
+	dir := filepath.Join(root, "plugins", "birdie")
+	config := filepath.Join(root, "config.yaml")
+	current, installed := readHermesSettings(root)
+	files := map[string]string{"plugin.yaml": birdie.HermesManifest, "__init__.py": birdie.HermesPlugin}
+
+	if r.remove {
+		if !installed && !pathExists(dir) {
+			return nil
+		}
+		r.say("disable the birdie plugin in Hermes, and take back its permission to start turns")
+		if !r.dry {
+			if err := r.backup(config); err != nil {
+				return err
+			}
+			hermesRun("plugins", "disable", "birdie") // fine if it wasn't enabled
+			hermesRun("config", "set", "plugins.entries.birdie.allow_gateway_injection", "false")
+		}
+		for _, name := range []string{"plugin.yaml", "__init__.py", "birdie.json"} {
+			if err := r.removeFile(filepath.Join(dir, name)); err != nil {
+				return err
+			}
+		}
+		if !r.dry {
+			os.RemoveAll(filepath.Join(dir, "__pycache__"))
+			os.Remove(dir) // only if empty
+		}
+		return nil
+	}
+
+	wake := current.Wake
+	if r.wake != nil {
+		wake = *r.wake
+	}
+	settings, err := json.MarshalIndent(hermesSettings{Agent: r.agent, URL: r.url, TokenFile: filepath.Join(tokenDir(), r.agent), Wake: wake}, "", "  ")
+	if err != nil {
+		return err
+	}
+	for _, name := range []string{"plugin.yaml", "__init__.py"} {
+		if err := r.write(filepath.Join(dir, name), files[name]); err != nil {
+			return err
+		}
+	}
+	if err := r.write(filepath.Join(dir, "birdie.json"), string(settings)+"\n"); err != nil {
+		return err
+	}
+	servers := hermesMCPServers(config)
+	r.say("enable the birdie plugin in Hermes")
+	for _, name := range servers {
+		r.say("remove the %s MCP server from Hermes, which the plugin replaces", name)
+	}
+	if r.wake != nil {
+		r.say("set Hermes's permission for the plugin to start turns to %v", wake)
+	}
+	if r.dry {
+		return nil
+	}
+	if err := r.backup(config); err != nil {
+		return err
+	}
+	for _, name := range servers {
+		if err := hermesRun("mcp", "remove", name); err != nil {
+			return err
+		}
+	}
+	if err := hermesRun("plugins", "enable", "birdie"); err != nil {
+		return err
+	}
+	if r.wake != nil {
+		if err := hermesRun("config", "set", "plugins.entries.birdie.allow_gateway_injection", fmt.Sprint(wake)); err != nil {
+			return err
+		}
+	}
+	// Hermes starts from the plugin tools it saw last time it ran, so without this
+	// its first conversation wouldn't have them.
+	hermesRun("tools", "list")
+	return nil
+}
+
+// hermesTimeout bounds each Hermes command, so a stuck Hermes can't hang setup.
+const hermesTimeout = 3 * time.Minute
+
+func hermesRun(args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), hermesTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "hermes", args...)
+	cmd.Stdin = strings.NewReader("y\n") // only what setup was asked to do; it answers a confirmation
+	cmd.WaitDelay = 5 * time.Second      // something it left running may hold its output open
+	out, err := cmd.CombinedOutput()
+	if ctx.Err() != nil {
+		return fmt.Errorf("hermes %s didn't finish in %s", strings.Join(args, " "), hermesTimeout)
+	}
+	if err != nil {
+		return fmt.Errorf("hermes %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// hermesMCPServers finds birdie's own MCP entries in Hermes's config, under either
+// name. Reading the YAML by line is enough: an entry is a key two spaces in.
+func hermesMCPServers(config string) []string {
+	b, err := os.ReadFile(config)
+	if err != nil {
+		return nil
+	}
+	var found []string
+	in := false
+	for line := range strings.Lines(string(b)) {
+		line = strings.TrimRight(line, "\r\n")
+		if line != "" && line[0] != ' ' && line[0] != '#' {
+			in = strings.TrimSpace(line) == "mcp_servers:"
+			continue
+		}
+		if in {
+			for _, name := range []string{"birdie", legacyServer} {
+				if line == "  "+name+":" {
+					found = append(found, name)
+				}
+			}
+		}
+	}
+	return found
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func grokHooks(exe, agent string) (string, error) {
