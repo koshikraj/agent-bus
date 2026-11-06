@@ -20,7 +20,9 @@ dist:
 		echo "dist/birdie-$$os-$$arch$$ext"; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -ldflags '$(LDFLAGS)' -o dist/birdie-$$os-$$arch$$ext ./cmd/birdie || exit 1; \
 	done
-	cd dist && rm -f checksums.txt && sha256sum birdie-* > checksums.txt
+	@echo dist/THIRD_PARTY_NOTICES
+	@./scripts/third-party-notices.sh $(PLATFORMS) > dist/THIRD_PARTY_NOTICES
+	cd dist && rm -f checksums.txt && sha256sum birdie-* THIRD_PARTY_NOTICES > checksums.txt
 
 clean:
 	rm -rf bin dist
