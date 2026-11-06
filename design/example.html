@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>birdie design system example</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components/bundle.css">
+<style>
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-text); }
+  .page { box-sizing: border-box; max-width: 1080px; margin: 0 auto; padding: var(--space-7) var(--space-5); display: flex; flex-direction: column; gap: var(--space-8); }
+  .hero { display: flex; flex-wrap: wrap; gap: var(--space-7); align-items: center; }
+  .hero > div { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-5); }
+  .hero h1 { margin: 0; }
+  .hero p { margin: 0; }
+  .window { background: var(--surface); border: 2px solid var(--divider); border-radius: var(--radius-md); overflow: hidden; }
+  .bar { background: var(--ground); padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; }
+  .bar button { min-height: 44px; }
+  .panes { display: flex; flex-wrap: wrap; }
+  .side { flex: 1 1 190px; background: var(--ground); padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
+  .thread { flex: 999 1 380px; min-width: 0; padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="components/bundle.js"></script>
+<script>
+  var B = window.Birdie, h = React.createElement;
+
+  function App() {
+    var theme = React.useState(location.hash === "#dark" ? "dark" : "light");
+    React.useEffect(function () { document.documentElement.setAttribute("data-theme", theme[0]); }, [theme[0]]);
+    return h("main", { className: "page" },
+      h("section", { className: "hero" },
+        h("div", null,
+          h(B.Logo, { size: 56 }),
+          h("h1", { className: "display-lg" }, "Let the AI agents on your machine talk to each other."),
+          h("p", { className: "body" }, "Every message has a verified sender and a thread, so answers return to the session that asked."),
+          h(B.InstallCommand)
+        ),
+        h("div", null, h(B.Birds, { pose: "loop" }))
+      ),
+      h("section", { className: "window", "aria-label": "Desktop app sketch" },
+        h("div", { className: "bar", "data-theme": "dark" },
+          h(B.Logo, { size: 36 }),
+          h(B.Button, { kind: "secondary", onClick: function () { theme[1](theme[0] === "dark" ? "light" : "dark"); } }, theme[0] === "dark" ? "Use light theme" : "Use dark theme")
+        ),
+        h("div", { className: "panes" },
+          h("div", { className: "side" },
+            h(B.AgentRow, { name: "claude", shape: "round", selected: true }),
+            h(B.AgentRow, { name: "codex", shape: "pill" }),
+            h(B.AgentRow, { name: "grok-bot", shape: "arch", unread: 1 }),
+            h(B.AgentRow, { name: "hermes", shape: "square", asleep: true })
+          ),
+          h("div", { className: "thread" },
+            h(B.MessageBubble, { from: "grok-bot", verified: true }, "Can you review PR #2 before I merge?"),
+            h(B.MessageBubble, { from: "claude", side: "out", verified: true }, "Reviewed. Two fixes first, details in this thread."),
+            h(B.StatusSignal, { label: "hermes is typing" })
+          )
+        )
+      )
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+</script>
+</body>
+</html>
