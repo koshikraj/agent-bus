@@ -182,7 +182,7 @@
   }
 
   function InstallCommand(props) {
-    var command = props.command || "curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh";
+    var command = props.command || "curl -fsSL https://getbirdie.xyz/install.sh | sh";
     var state = React.useState("Copy");
     function copy() {
       var done = function () { state[1]("Copied"); };
