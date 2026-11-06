@@ -10,7 +10,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJiaXJkaWUgc21hbGwgaWNvbiI+PHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiByeD0iNiIgZmlsbD0iI0RDRjVFOCIvPjxjaXJjbGUgY3g9IjkiIGN5PSIxNCIgcj0iNS41IiBmaWxsPSIjRkY1NTMzIi8+PHJlY3QgeD0iMTUiIHk9IjQuNSIgd2lkdGg9IjYuNSIgaGVpZ2h0PSIxNSIgcng9IjMuMjUiIGZpbGw9IiMwQjZFNjkiLz48L3N2Zz4K">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Mono:wght@400;500&family=JetBrains+Mono:wght@400;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">
 <style>
 /* Layout: one wire runs edge to edge through the hero, then three bands: night for the flow, ground for install, tomato to close.
    Colors and type are the birdie design tokens (design/tokens.json). */
@@ -28,7 +28,9 @@
   --font-text: "DM Sans", system-ui, sans-serif;
   --font-mono: "DM Mono", ui-monospace, Menlo, Consolas, monospace;
   --gutter: clamp(16px, 4vw, 40px);
-  --term-bg: #051B19; --term-bar: #0E2C29; --term-line: #24504A; --term-ink: #DDF3EB; --term-dim: #86ADA6; --term-out: #FFB199; --term-in: #4FD1C5;
+  --font-term: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --t-bg: #262C2F; --t-bar: #1B2022; --t-ink: #E6EAEB; --t-dim: #8B9599; --t-rule: #5A6468; --t-band: #3A4246; --t-crab: #D97757; --t-yellow: #E5B93C; --t-blue: #6CB2F0; --t-model: #E8DFA6; --t-green: #A9D47A; --t-gold: #FFD700; --t-bronze: #CD7F32; --t-cream: #FFF8DC;
+  --c-bg: #FAFAF8; --c-in: #EDEDEB; --c-ink: #1B1B1A; --c-dim: #8A8A85; --c-line: #DEDED9;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -117,42 +119,96 @@ code, .mono { font-family: var(--font-mono); }
 .pn { display: flex; flex-direction: column; gap: 1px; font: 700 clamp(16px, 1.6vw, 20px)/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-muted); transition: color .3s; }
 .pn small { font: 400 13px/1.3 var(--font-mono); letter-spacing: 0; color: var(--ink-muted); }
 .miles li[data-s="active"] .pn, .miles li[data-s="done"] .pn { color: var(--ink); }
-.flow-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 24px 40px; align-items: start; }
+.flow-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px 40px; align-items: start; }
 .flow-stage { min-width: 0; }
 .flow-stage svg { display: block; width: 100%; height: auto; }
-.flow-now { display: none; min-height: 68px; font: 400 14px/1.4 var(--font-mono); }
-.flow-now b { display: block; font-weight: 500; color: var(--ink-muted); }
 .flow-foot { display: flex; justify-content: flex-end; }
 .flow-side { min-width: 0; }
-.term { border-radius: 10px; overflow: hidden; background: var(--term-bg); box-shadow: 0 0 0 1px var(--term-line), 0 18px 40px rgb(0 0 0 / 0.28); }
-.term-bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 10px 14px; background: var(--term-bar); color: var(--term-dim); font: 400 13px/1.2 var(--font-mono); }
-.term-dots { display: flex; gap: 7px; }
-.term-dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--term-line); }
-.term-bar b { font-weight: 500; color: var(--term-ink); white-space: nowrap; }
-.log { display: flex; flex-direction: column; gap: 5px; padding: 16px 16px 10px; font: 400 clamp(13px, 1.1vw, 14.500px)/1.45 var(--font-mono); color: var(--term-ink); }
-.log li { display: grid; grid-template-columns: 2ch 9ch minmax(0, 1fr); column-gap: 1ch; min-width: 0; }
-.log .m { color: var(--term-dim); }
-.log .n { white-space: nowrap; }
-.log .x { min-width: 0; overflow-wrap: anywhere; }
-.log .r { visibility: hidden; }
-.log .v { color: var(--term-in); margin-right: 1ch; }
-.log li[data-s="future"] { visibility: hidden; }
-.log li.out .m, .log li.out .n { color: var(--term-out); }
-.log li.in .m, .log li.in .n { color: var(--term-in); }
-.log li.work, .log li.work .m { color: var(--term-dim); }
-.log li.you .m, .log li.done .m { color: var(--tomato); }
-.log li.you .x, .log li.prompt .x { grid-column: 2 / -1; font-weight: 500; }
-.log li.done .x { grid-column: 2 / -1; color: var(--term-in); font-weight: 500; }
-.log li.work .x { grid-column: 2 / -1; font-style: normal; }
-.log li.prompt .m { color: var(--tomato); }
-.log .c { display: none; width: 0.62em; height: 1.1em; margin-right: -0.62em; vertical-align: -0.18em; background: var(--term-ink); }
-.log li[data-s="now"] .c { display: inline-block; }
-.log li.prompt[data-s="now"] .c { animation: blink 1.06s steps(1) infinite; }
-@keyframes blink { 50% { opacity: 0; } }
-.term-key { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 10px 16px 14px; border-top: 1px solid var(--term-line); color: var(--term-dim); font: 400 12px/1.4 var(--font-mono); }
-.term-key b { font-weight: 500; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* One real-looking screen per agent, shown while that agent is acting. */
+.desk { border-radius: 10px; overflow: hidden; background: var(--t-bar); box-shadow: 0 0 0 1px #000, 0 18px 44px rgb(0 0 0 / 0.32); }
+.tabs { display: flex; gap: 2px; padding: 6px 6px 0; overflow-x: auto; scrollbar-width: none; }
+.tab { display: inline-flex; align-items: center; gap: 7px; flex: 1 1 0; min-width: 0; min-height: 40px; padding: 0 10px; border: 0; border-radius: 7px 7px 0 0; background: transparent; color: var(--t-dim); font: 400 12.500px/1 var(--font-term); white-space: nowrap; cursor: pointer; }
+.tab:hover { color: var(--t-ink); }
+.tab[aria-pressed="true"] { background: var(--t-bg); color: var(--t-ink); }
+.tab[data-w="grokbot"][aria-pressed="true"] { background: var(--c-bg); color: var(--c-ink); }
+.tab:focus-visible { outline-offset: -2px; }
+.tab i { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 5px; background: #FFFFFF; }
+.tab svg { width: 16px; height: 16px; display: block; }
+.wins { position: relative; height: 468px; background: var(--t-bg); }
+.win { position: absolute; inset: 0; display: flex; flex-direction: column; opacity: 0; visibility: hidden; transition: opacity .22s, visibility 0s .22s; }
+.win.on { opacity: 1; visibility: visible; transition: opacity .22s; }
+/* Lines fill from the top; once full, the newest stay in view and old ones scroll off. */
+.scr { flex: 1; min-height: 0; display: flex; flex-direction: column-reverse; overflow: hidden; padding: 14px 14px 10px; }
+.col { flex: none; display: flex; flex-direction: column; gap: 9px; margin-bottom: auto; }
+.term { background: var(--t-bg); color: var(--t-ink); font: 400 clamp(12px, 1vw, 13.500px)/1.5 var(--font-term); }
+.ln { flex: none; overflow-wrap: anywhere; }
+.ln .r { visibility: hidden; }
+.dim { color: var(--t-dim); }
+.term b { font-weight: 700; }
+.sh { background: linear-gradient(90deg, currentColor 35%, #FFFFFF 50%, currentColor 65%); background-size: 240% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 1.8s linear infinite; }
+@keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.banner { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 14px; align-items: center; }
+.banner svg { width: 66px; height: 66px; grid-row: span 3; color: var(--t-crab); margin-block: -6px; }
+.cur { display: inline-block; width: 0.6em; height: 1.15em; margin-right: -0.6em; vertical-align: -0.2em; background: currentColor; }
+.win:not(.on) .cur { visibility: hidden; }
+/* Claude Code */
+.w-claude .band { margin-inline: -14px; padding: 2px 14px; background: #30373A; }
+.w-claude .prompt { color: var(--t-dim); }
+.w-claude .tool { color: var(--t-dim); margin-left: 2ch; }
+.w-claude .spin { color: var(--t-crab); }
+.w-claude .spin .dim { color: var(--t-dim); }
+.msgin { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1ch; }
+.msgin > span:first-child { color: var(--t-dim); }
+.msgin b { font-weight: 400; color: var(--t-crab); }
+.comp-claude { flex: none; padding: 0 14px 12px; }
+.comp-claude .box { border-block: 1px solid var(--t-rule); margin-inline: -14px; padding: 5px 14px; min-height: 2.2em; }
+.comp-claude .auto { margin-top: 8px; padding-left: 2ch; color: var(--t-yellow); }
+/* Codex */
+.w-codex .band { margin-inline: -14px; padding: 8px 14px; background: var(--t-band); }
+.w-codex .blt { color: var(--t-dim); }
+.w-codex .blt-on { color: var(--t-green); }
+.w-codex .out { display: block; padding-left: 2ch; color: var(--t-dim); }
+.w-codex .fn { color: var(--t-blue); }
+.w-codex .box { display: inline-block; padding: 6px 12px; border: 1px solid var(--t-rule); border-radius: 4px; }
+.comp-codex { flex: none; }
+.comp-codex .input { padding: 12px 14px; background: var(--t-band); }
+.comp-codex .ph { color: var(--t-dim); }
+.comp-codex .meta { padding: 8px 14px 12px; color: var(--t-model); }
+/* Hermes */
+.w-hermes .gold { color: var(--t-gold); font-weight: 700; }
+.w-hermes .acc { color: var(--t-cream); }
+.w-hermes .box { display: inline-block; padding: 6px 12px; border: 1px solid var(--t-bronze); border-radius: 4px; color: var(--t-cream); }
+.w-hermes .bar { display: block; width: min(40ch, 100%); height: 1px; margin-bottom: 4px; background: var(--t-gold); }
+.comp-hermes { flex: none; padding: 0 14px 12px; }
+.comp-hermes .rule { display: flex; align-items: center; color: var(--t-bronze); white-space: nowrap; overflow: hidden; }
+.comp-hermes .rule::after { content: ""; flex: 1; height: 1px; background: var(--t-bronze); }
+.comp-hermes .rule::before { content: ""; flex: none; width: 2ch; height: 1px; background: var(--t-bronze); }
+.comp-hermes .rule b { font-weight: 400; color: var(--t-gold); }
+.comp-hermes .rule b:not(:empty) { padding-inline: 1ch; }
+.comp-hermes .input { padding-block: 5px; }
+.comp-hermes .low { height: 1px; background: var(--t-bronze); }
+.comp-hermes .meta { padding-top: 7px; color: var(--t-dim); overflow-wrap: anywhere; }
+/* Grok Bot's chat window */
+.w-grokbot { background: var(--c-bg); color: var(--c-ink); font: 400 15px/1.35 var(--font-text); }
+.w-grokbot .col { gap: 6px; margin-bottom: 0; }
+.w-grokbot .when { align-self: center; color: var(--c-dim); font-size: 12px; margin-block: 2px 8px; }
+.bub { flex: none; max-width: 82%; padding: 8px 13px; border-radius: 16px; background: var(--c-in); color: var(--c-ink); align-self: flex-start; }
+.bub.me { align-self: flex-end; background: #1B1B1A; color: #FFFFFF; }
+.bub.me + .bub:not(.me), .bub:not(.me) + .bub.me { margin-top: 10px; }
+.act { flex: none; display: flex; align-items: center; gap: 9px; margin-top: 4px; color: var(--c-dim); font-size: 14px; }
+.act .sh { background-image: linear-gradient(90deg, #8A8A85 35%, #1B1B1A 50%, #8A8A85 65%); }
+.eyes { display: inline-flex; align-items: center; justify-content: center; gap: 2.500px; flex: none; width: 24px; height: 24px; border-radius: 50%; background: #111111; }
+.eyes i { width: 4.500px; height: 9px; border-radius: 3px; background: #FFFFFF; animation: look 2.4s ease-in-out infinite; }
+@keyframes look { 0%, 44%, 56%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.15); } }
+.chatbox { flex: none; display: flex; align-items: center; gap: 8px; margin: 2px 14px 14px; padding: 6px 7px; border: 1px solid var(--c-line); border-radius: 22px; background: #FFFFFF; color: var(--c-dim); font-size: 14px; }
+.chatbox span { flex: 1; min-width: 0; }
+.chatbox .ci { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; background: #EFEFEC; color: #55554F; font-size: 17px; line-height: 1; }
+.chatbox .wave { background: #111111; color: #FFFFFF; font-size: 11px; letter-spacing: -1px; }
 .note { margin-top: 14px; font-size: 14px; line-height: 1.45; color: var(--ink-muted); }
 .note code { white-space: nowrap; color: var(--ink); }
+[hidden] { display: none !important; }
 
 /* Install */
 .install { padding-block: clamp(40px, 5vw, 64px); }
@@ -188,9 +244,13 @@ code, .mono { font-family: var(--font-mono); }
 .close .links a:hover { background: var(--brand-ink); color: var(--tomato); }
 .close-note { padding-bottom: 24px; font: 400 13px/1.5 var(--font-mono); }
 
+@media (max-width: 1180px) {
+  .tab { flex: 0 0 auto; padding: 0 9px; }
+  .tab[aria-pressed="true"] { flex: 1 1 auto; }
+  .tab:not([aria-pressed="true"]) .nm { display: none; }
+}
 @media (max-width: 900px) {
   .hero-copy, .flow-head, .flow-grid, .close-in { grid-template-columns: minmax(0, 1fr); }
-  .flow-now { display: block; }
   .close .links { justify-content: flex-start; }
 }
 @media (max-width: 640px) {
@@ -199,12 +259,14 @@ code, .mono { font-family: var(--font-mono); }
   .pi svg { width: 22px; height: 22px; }
   .miles li:not(:last-child)::after { top: 20px; left: 48px; right: 4px; }
   .pn small { font-size: 12px; }
+  .wins { height: 452px; }
+  .w-grokbot { font-size: 14.500px; }
   .links a { padding-inline: 8px; }
   .cmd { flex-wrap: wrap; }
   .cmd code { flex-basis: 100%; }
   .cmd button { flex: 1; }
 }
-@media (prefers-reduced-motion: reduce) { .pi, .pn, .miles li::after { transition: none; } .log li.prompt[data-s="now"] .c { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .pi, .pn, .miles li::after { transition: none; } .win { transition: none; } .sh { animation: none; background: none; -webkit-text-fill-color: currentColor; } .eyes i { animation: none; } }
 </style>
 </head>
 <body>
@@ -257,16 +319,15 @@ code, .mono { font-family: var(--font-mono); }
       <div class="flow-grid">
         <div class="flow-stage">
           <svg id="flow-svg" viewBox="0 0 640 566" role="img" aria-label="A red bird named claude sits at the center of three wires. Letters travel to grok-bot for design, codex for review and hermes for deploy, and answers travel back."></svg>
-          <p class="flow-now" id="flow-now" aria-hidden="true"></p>
           <div class="flow-foot"><button type="button" class="ctl" id="flow-ctl">Play</button></div>
         </div>
         <div class="flow-side">
-          <div class="term">
-            <div class="term-bar"><span class="term-dots" aria-hidden="true"><i></i><i></i><i></i></span><b>claude: ~/app</b><span></span></div>
-            <ol class="log" id="log" aria-label="Example session"></ol>
-            <div class="term-key" aria-hidden="true"><span><b style="color:var(--term-out)">&rarr;</b> sent</span><span><b style="color:var(--term-in)">&larr;</b> received</span><span><b style="color:var(--term-in)">&check;</b> verified sender</span></div>
+          <div class="desk">
+            <div class="tabs" id="tabs" role="group" aria-label="Show an agent's screen"></div>
+            <div class="wins" id="wins" aria-hidden="true"></div>
           </div>
-          <p class="note">An example session. You choose which agent does what, and each one works with its own tools. birdie carries the messages and checks who sent them. Hermes only wakes on a message if you set it up with <code>birdie setup hermes --wake</code>. Otherwise messages wait for its next turn.</p>
+          <ol class="sr" id="transcript" aria-label="Example messages"></ol>
+          <p class="note">An example, not a recording. You choose which agent does what, and each one works with its own tools. birdie carries the messages and checks who sent them. Hermes only wakes on a message if you set it up with <code>birdie setup hermes --wake</code>. Otherwise messages wait for its next turn.</p>
         </div>
       </div>
     </div>
@@ -567,48 +628,201 @@ code, .mono { font-family: var(--font-mono); }
   }
 
   /* ---------- flow: one coordinator, three colleagues ---------- */
-  var flowSvg = document.getElementById("flow-svg"), logEl = document.getElementById("log"), flowNow = document.getElementById("flow-now");
+  var flowSvg = document.getElementById("flow-svg");
   var STEPS = [
-    { from: "you", to: "claude", text: "Add dark mode to settings and ship it.", after: 0.5 },
-    { from: "claude", to: "grok-bot", text: "We need a dark palette for settings. Any ideas?" },
-    { from: "grok-bot", to: "claude", text: "Three options in Figma. I'd pick the middle one.", after: 2.2 },
-    { from: "claude", to: "codex", text: "The PR is up on GitHub. Can you review it?" },
-    { from: "codex", to: "claude", text: "The toggle resets on reload. One fix needed.", after: 1.5 },
-    { from: "claude", to: "codex", text: "Fixed. Another look?" },
-    { from: "codex", to: "claude", text: "Looks good. Approved." },
-    { from: "claude", to: "hermes", text: "Approved. Please deploy it to Vercel." },
-    { from: "hermes", to: "claude", text: "It's live on Vercel and the smoke tests pass." },
-    { from: "claude", to: "you", text: "Dark mode is live, reviewed and tested." }
+    { at: 1.9, from: "you", to: "claude", text: "Add dark mode to settings and ship it." },
+    { at: 4.0, from: "claude", to: "grok-bot", text: "We need a dark palette for settings. Any ideas?" },
+    { at: 9.6, from: "grok-bot", to: "claude", text: "Three options in Figma. I'd pick the middle one." },
+    { at: 14.6, from: "claude", to: "codex", text: "The PR is up on GitHub. Can you review it?" },
+    { at: 19.2, from: "codex", to: "claude", text: "The toggle resets on reload. One fix needed." },
+    { at: 22.7, from: "claude", to: "codex", text: "Fixed. Another look?" },
+    { at: 26.0, from: "codex", to: "claude", text: "Looks good. Approved." },
+    { at: 28.1, from: "claude", to: "hermes", text: "Approved. Please deploy it to Vercel." },
+    { at: 33.0, from: "hermes", to: "claude", text: "It's live on Vercel and the smoke tests pass." },
+    { at: 34.6, from: "claude", to: "you", text: "Dark mode is live, reviewed and tested." }
   ];
-  (function () { var s = 0.4; STEPS.forEach(function (st) { st.at = s; s += 1 + (st.after == null ? 0.65 : st.after); }); STEPS.end = STEPS[STEPS.length - 1].at + 1; })();
-  var FLOW_HOLD = 4, FLOW_T = STEPS.end + FLOW_HOLD;
-
-  // The terminal is claude's session: what you typed, what it sent, what came back, and its own work.
-  var LINES = [];
-  STEPS.forEach(function (st, i) {
-    var kind = st.from === "you" ? "you" : st.to === "you" ? "done" : st.from === "claude" ? "out" : "in";
-    LINES.push({ kind: kind, at: st.at + (kind === "out" || kind === "you" ? 0 : 0.85), who: kind === "out" ? st.to : st.from, text: st.text, step: st });
-    if (i === 2) LINES.push({ kind: "work", at: st.at + 1.3, text: "Writing the code and opening a PR on GitHub...", who: "claude" });
-    if (i === 4) LINES.push({ kind: "work", at: st.at + 1.3, text: "Fixing the toggle and pushing to the PR...", who: "claude" });
-  });
-  LINES.push({ kind: "prompt", at: STEPS.end, text: "", who: "" });
-  var MARK = { you: "\u276f", out: "\u2192", "in": "\u2190", work: "\u00b7", done: "\u2713", prompt: "\u276f" };
-  LINES.forEach(function (ln) {
-    var li = document.createElement("li"); li.className = ln.kind;
-    var m = document.createElement("span"); m.className = "m"; m.textContent = MARK[ln.kind]; li.appendChild(m);
-    if (ln.kind === "out" || ln.kind === "in") { var n = document.createElement("span"); n.className = "n"; n.textContent = ln.who; li.appendChild(n); }
-    var x = document.createElement("span"); x.className = "x";
-    if (ln.kind === "in") { var v = document.createElement("span"); v.className = "v"; v.textContent = "\u2713"; v.title = "Verified sender"; x.appendChild(v); }
-    ln.t = document.createElement("span"); ln.t.className = "t"; ln.t.textContent = ln.text; x.appendChild(ln.t);
-    var c = document.createElement("i"); c.className = "c"; x.appendChild(c);
-    ln.r = document.createElement("span"); ln.r.className = "r"; x.appendChild(ln.r);
-    li.appendChild(x);
-    li.setAttribute("data-s", "past");
-    logEl.appendChild(li); ln.li = li; ln.shown = ln.text.length;
-  });
-  var TYPE_CPS = 60;
+  STEPS.end = 35.6;
+  var FLOW_HOLD = 5, FLOW_T = STEPS.end + FLOW_HOLD;
   var miles = Array.prototype.slice.call(document.querySelectorAll(".miles li"));
   var MILE_T = [[STEPS[1].at, STEPS[2].at + 1], [STEPS[2].at + 1, STEPS[3].at], [STEPS[3].at, STEPS[6].at + 1], [STEPS[7].at, STEPS[8].at + 1]];
+
+  STEPS.forEach(function (st) {
+    var li = document.createElement("li");
+    li.textContent = st.from + " to " + st.to + ": " + st.text;
+    document.getElementById("transcript").appendChild(li);
+  });
+
+  /* ---------- the agents' screens ---------- */
+  var ACTIVE = [[0, "claude"], [5.0, "grokbot"], [10.6, "claude"], [15.6, "codex"], [20.2, "claude"], [23.7, "codex"], [27.0, "claude"], [29.1, "hermes"], [34.0, "claude"]];
+  var SPIN_CLAUDE = ["✻", "✽", "✶", "✢"], SPIN_HERMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  var STREAM_CPS = 70, TYPE_CPS = 26;
+  function esc(x) { return x.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+  function callJson(to, text, tail) { return '<span class="blt-on">•</span> <b>Called</b> <span class="fn">birdie</span>.send_message({"to":"' + to + '","content":"' + esc(text) + '"})<span class="out">└ {"message_id":"msg_' + tail + '","status":"queued","thread_id":"thr_' + tail + '"}</span>'; }
+  function fromClaude(t) { return { at: t.at, cls: "band", html: '<span class="dim">›</span> Message from claude: ' + esc(t.text) }; }
+  function claudeSpin(from, to, verb) {
+    return { at: from, until: to, cls: "spin", dyn: function (t) {
+      var sec = Math.max(1, Math.ceil(t - from));
+      return SPIN_CLAUDE[Math.floor(t * 6) % 4] + " " + verb + '… <span class="dim">(' + sec + "s · ↓ " + (sec * 310) + " tokens)</span>";
+    } };
+  }
+  function codexWork(from, to) {
+    return { at: from, until: to, dyn: function (t) { return '<span class="blt-on">•</span> <span class="sh">Working</span> <span class="dim">(' + Math.max(1, Math.ceil(t - from)) + "s • <b>esc</b> to interrupt)</span>"; } };
+  }
+  function chatAct(from, to, text) { return { at: from, until: to, raw: '<div class="act"><span class="eyes"><i></i><i></i></span><span class="sh">' + text + "</span></div>" }; }
+  function bub(at, text, me) { return { at: at, raw: '<div class="bub' + (me ? " me" : "") + '">' + text + "</div>" }; }
+  function rep(at, who, text) { return { at: at, cls: "msgin", html: '<span>←</span><span><b>' + who + '</b> <span class="dim">(verified)</span> ' + esc(text) + "</span>" }; }
+  function say(at, text, pre) { return { at: at, stream: text, pre: pre == null ? "● " : pre }; }
+  var CALLED = '<span class="dim">Called birdie (ctrl+o to expand)</span>';
+
+  var WINS = {
+    claude: { name: "claude code", icon: "i-claudecode", iconColor: "#D97757", lines: [
+      { at: 0, raw: '<div class="ln banner"><svg aria-hidden="true"><use href="#i-claudecode"/></svg><b>Claude Code</b><span class="dim">Opus 5.5</span><span class="dim">~/app</span></div>' },
+      { at: 1.9, cls: "band", html: '<span class="prompt">❯</span> ' + esc(STEPS[0].text) },
+      claudeSpin(2.2, 3.4, "Planning"),
+      say(3.4, "I'll get a palette from Grok Bot first."),
+      { at: 3.95, cls: "tool", html: CALLED },
+      rep(10.6, "grok-bot", STEPS[2].text),
+      say(11.2, "Going with the middle one. Writing the code now."),
+      claudeSpin(11.8, 14.0, "Garnishing"),
+      say(14.0, "The PR is up on GitHub. Asking Codex to review it."),
+      { at: 14.55, cls: "tool", html: CALLED },
+      rep(20.2, "codex", STEPS[4].text),
+      claudeSpin(20.8, 22.2, "Fixing"),
+      say(22.2, "Fixed and pushed. Asking Codex for another look."),
+      { at: 22.65, cls: "tool", html: CALLED },
+      rep(27.0, "codex", STEPS[6].text),
+      say(27.5, "Approved. Asking Hermes to deploy it to Vercel."),
+      { at: 28.05, cls: "tool", html: CALLED },
+      rep(34.0, "hermes", STEPS[8].text),
+      say(34.6, STEPS[9].text),
+      { at: 35.3, cls: "dim", html: "✻ Worked for 33s" }
+    ], comp: function (w) {
+      w.c = document.createElement("div"); w.c.className = "comp-claude";
+      w.c.innerHTML = '<div class="box"><span class="prompt dim">❯</span> <span class="ty"></span><i class="cur"></i></div><div class="auto">▸▸ auto mode on <span class="dim">(shift+tab to cycle)<span class="busy"> · esc to interrupt</span></span></div>';
+    } },
+    grokbot: { name: "grok bot", icon: "i-grok", iconColor: "#000000", chat: true, lines: [
+      { at: 0, raw: '<div class="when">Today 9:41 AM</div>' },
+      bub(0, "morning", true),
+      bub(0, "Morning! Anything I can do for you?"),
+      chatAct(5.0, 6.0, "Reading Claude's message"),
+      bub(6.0, "Claude just asked for a dark palette for settings. I'm on it."),
+      chatAct(6.4, 8.6, "Looking through Figma"),
+      bub(8.6, STEPS[2].text),
+      chatAct(9.0, 9.9, "Sending it to Claude"),
+      bub(9.9, "Sent. Claude has it.")
+    ], comp: function (w) {
+      w.c = document.createElement("div"); w.c.className = "chatbox";
+      w.c.innerHTML = '<i class="ci">+</i><span>Message Grok Bot</span><i class="ci">•</i><i class="ci wave">|||</i>';
+    } },
+    codex: { name: "codex", icon: "i-codex", lines: [
+      { at: 0, raw: '<div class="ln"><div class="box"><b>&gt;_ OpenAI Codex</b><br><span class="dim">model:</span> GPT-6-Astra medium<br><span class="dim">directory:</span> ~/app</div></div>' },
+      fromClaude(STEPS[3]),
+      codexWork(16.0, 18.6),
+      { at: 16.7, html: '<span class="blt">•</span> <b>Ran</b> gh pr diff<span class="out">└ 4 files changed, 86 insertions(+), 12 deletions(-)</span>' },
+      say(18.6, "The toggle resets on reload. One fix needed.", "• "),
+      { at: 19.1, html: callJson("claude", "The toggle resets on reload. One fix needed.", "7c1e4a") },
+      { at: 19.7, cls: "dim", html: "Worked for 4s" },
+      fromClaude(STEPS[5]),
+      codexWork(24.0, 25.4),
+      { at: 24.5, html: '<span class="blt">•</span> <b>Ran</b> gh pr diff<span class="out">└ 1 file changed, 3 insertions(+)</span>' },
+      say(25.4, "Looks good. Approved.", "• "),
+      { at: 25.85, html: callJson("claude", "Looks good. Approved.", "92bd07") },
+      { at: 26.4, cls: "dim", html: "Worked for 2s" }
+    ], comp: function (w) {
+      w.c = document.createElement("div"); w.c.className = "comp-codex";
+      w.c.innerHTML = '<div class="input"><span class="dim">›</span> <i class="cur"></i><span class="ph">Ask Codex to do anything</span></div><div class="meta">GPT-6-Astra medium · ~/app</div>';
+    } },
+    hermes: { name: "hermes", icon: "i-hermes", lines: [
+      { at: 0, raw: '<div class="ln"><div class="box"><span class="gold">☤ Hermes Agent</span><br><span class="dim">gpt-5-mini · ~/app</span></div></div>' },
+      { at: 29.1, raw: '<div class="ln"><span class="bar"></span><span class="acc">❯</span> Message from claude: ' + esc(STEPS[7].text) + "</div>" },
+      { at: 29.7, cls: "dim", html: "∴ Thought for 1s · Planning the deploy" },
+      { at: 30.2, html: "📖 Read vercel.json" },
+      { at: 30.9, html: '<span style="color:var(--t-green)">✓</span> $ vercel deploy <span class="dim">0.7s</span>' },
+      { at: 31.6, html: '<span style="color:var(--t-green)">✓</span> $ npm run test:smoke <span class="dim">0.6s</span>' },
+      { at: 32.2, raw: '<div class="ln"><span class="bar"></span><span class="gold">☤ Hermes</span></div>' },
+      say(32.3, STEPS[8].text, ""),
+      { at: 32.9, html: "🔧 birdie_send_message <span class=\"dim\">0.1s</span>" },
+      { at: 33.4, cls: "dim", html: "─ 4.3s · ran 2 commands · read 1 file" }
+    ], comp: function (w) {
+      w.c = document.createElement("div"); w.c.className = "comp-hermes";
+      w.c.innerHTML = '<div class="rule"><span class="act2"><b></b></span></div><div class="input"><span class="acc">❯</span> <i class="cur"></i><span class="dim ph">type to redirect this turn</span></div><div class="low"></div><div class="meta">gpt-5-mini · ctx [░░░░░░░░] 4% · ~/app</div>';
+    } }
+  };
+
+  function buildDesk() {
+    var tabsEl = document.getElementById("tabs"), winsEl = document.getElementById("wins");
+    Object.keys(WINS).forEach(function (k) {
+      var w = WINS[k];
+      var tab = document.createElement("button");
+      tab.type = "button"; tab.className = "tab"; tab.setAttribute("data-w", k); tab.id = "tab-" + k;
+      tab.innerHTML = '<i><svg aria-hidden="true" style="color:' + (w.iconColor || "#000") + '"><use href="#' + w.icon + '"/></svg></i><span class="nm">' + w.name + "</span>";
+      tab.setAttribute("aria-label", "Show " + w.name);
+      tabsEl.appendChild(tab); w.tab = tab;
+      var el = document.createElement("div"); el.className = "win w-" + k + (w.chat ? "" : " term");
+      var scr = document.createElement("div"); scr.className = "scr"; el.appendChild(scr);
+      var col = document.createElement("div"); col.className = "col"; scr.appendChild(col);
+      w.lines.forEach(function (ln) {
+        var holder = document.createElement("div");
+        if (ln.raw) { holder.innerHTML = ln.raw; ln.el = holder.firstChild; }
+        else {
+          holder.className = "ln" + (ln.cls ? " " + ln.cls : "");
+          if (ln.html) holder.innerHTML = ln.html;
+          if (ln.stream != null) {
+            holder.appendChild(document.createTextNode(ln.pre));
+            ln.t = document.createElement("span"); ln.t.textContent = ln.stream; holder.appendChild(ln.t);
+            ln.r = document.createElement("span"); ln.r.className = "r"; holder.appendChild(ln.r);
+            ln.shown = ln.stream.length;
+          }
+          ln.el = holder;
+        }
+        col.appendChild(ln.el);
+      });
+      w.comp(w); el.appendChild(w.c);
+      winsEl.appendChild(el); w.el = el;
+      tab.addEventListener("click", function () { desk.pin = k; desk.pinFrom = desk.active; desk.draw(); });
+    });
+    var claude = WINS.claude.c;
+    desk.typed = claude.querySelector(".ty"); desk.busy = claude.querySelector(".busy");
+    desk.rule = WINS.hermes.c.querySelector(".act2 b");
+  }
+  var desk = { pin: null, pinFrom: null, active: "claude", shown: null, draw: function () {
+    var want = desk.pin || desk.active;
+    if (want === desk.shown) return;
+    desk.shown = want;
+    Object.keys(WINS).forEach(function (k) {
+      WINS[k].el.classList.toggle("on", k === want);
+      WINS[k].tab.setAttribute("aria-pressed", k === want ? "true" : "false");
+    });
+  } };
+  buildDesk();
+  var CLAUDE_PROMPT = STEPS[0].text, BUSY = [[1.9, 3.95], [10.6, 14.55], [20.2, 22.65], [27.0, 28.05], [34.0, 35.3]];
+  function renderDesk(t) {
+    var a = "claude";
+    ACTIVE.forEach(function (x) { if (t >= x[0]) a = x[1]; });
+    if (a !== desk.active) { desk.active = a; if (desk.pin && desk.pin !== desk.pinFrom) desk.pin = null; }
+    if (desk.pin && a !== desk.pinFrom) desk.pin = null;
+    desk.draw();
+    Object.keys(WINS).forEach(function (k) {
+      WINS[k].lines.forEach(function (ln) {
+        var on = t >= ln.at && (ln.until == null || t < ln.until);
+        if (ln.on !== on) { ln.on = on; ln.el.hidden = !on; }
+        if (!on) return;
+        if (ln.dyn) { var h = ln.dyn(t); if (h !== ln.last) { ln.last = h; ln.el.innerHTML = h; } }
+        if (ln.stream != null) {
+          var n = Math.min(ln.stream.length, Math.floor((t - ln.at) * STREAM_CPS));
+          if (n !== ln.shown) { ln.shown = n; ln.t.textContent = ln.stream.slice(0, n); ln.r.textContent = ln.stream.slice(n); }
+        }
+      });
+    });
+    // What you type into Claude Code, then its status line.
+    var typed = t >= 0.4 && t < 1.9 ? CLAUDE_PROMPT.slice(0, Math.floor((t - 0.4) * TYPE_CPS)) : "";
+    if (desk.typed.textContent !== typed) desk.typed.textContent = typed;
+    var busy = BUSY.some(function (b) { return t >= b[0] && t < b[1]; });
+    if (busy !== desk.isBusy) { desk.isBusy = busy; desk.busy.hidden = !busy; }
+    var hBusy = t >= 29.3 && t < 32.9;
+    var rule = hBusy ? SPIN_HERMES[Math.floor(t * 10) % 10] + " Deploying · " + Math.max(1, Math.ceil(t - 29.3)) + "s" : "";
+    if (rule !== desk.lastRule) { desk.lastRule = rule; desk.rule.textContent = rule; }
+  }
 
   var flow = (function () {
     var svg = flowSvg, F = { x: 130, y: 322 };
@@ -737,28 +951,12 @@ code, .mono { font-family: var(--font-mono); }
       pop(ok, t, STEPS[6].at + 0.2, Infinity);
       pop(live, t, STEPS[8].at + 0.2, Infinity);
 
-      // The terminal types the current line, and the pipeline follows along.
-      var cur = -1;
-      LINES.forEach(function (ln, i) { if (t >= ln.at) cur = i; });
-      LINES.forEach(function (ln, i) {
-        var s = i > cur ? "future" : i === cur ? "now" : "past";
-        if (ln.li.getAttribute("data-s") !== s) ln.li.setAttribute("data-s", s);
-        var n = s === "future" ? 0 : s === "past" ? ln.text.length : Math.min(ln.text.length, Math.floor((t - ln.at) * TYPE_CPS));
-        if (n !== ln.shown) { ln.shown = n; ln.t.textContent = ln.text.slice(0, n); ln.r.textContent = ln.text.slice(n); }
-      });
+      // The agent's screen and the pipeline follow along.
+      renderDesk(t);
       miles.forEach(function (m, i) {
         var w = MILE_T[i], s = t >= w[1] ? "done" : t >= w[0] ? "active" : "todo";
         if (m.getAttribute("data-s") !== s) m.setAttribute("data-s", s);
       });
-      var st = STEPS[0];
-      STEPS.forEach(function (x) { if (t >= x.at) st = x; });
-      var key = st.from + " \u2192 " + st.to + "|" + st.text;
-      if (flowNow.getAttribute("data-k") !== key) {
-        flowNow.setAttribute("data-k", key);
-        flowNow.innerHTML = "";
-        var b = document.createElement("b"); b.textContent = st.from + " \u2192 " + st.to;
-        flowNow.appendChild(b); flowNow.appendChild(document.createTextNode(st.text));
-      }
     };
   })();
 
