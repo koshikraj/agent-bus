@@ -364,3 +364,8 @@ Addresses are `agent[/session][@node]` so other machines can be added without
 changing existing names; `@node` is refused for now. Rules about who may message
 whom live in one place (`Bus.admit`), and a remote agent can be another
 `bus.Deliverer`.
+
+## License
+
+[MIT](LICENSE). The names and logos of other companies' products, used to show
+which agents birdie works with, belong to their owners and aren't covered by it.
