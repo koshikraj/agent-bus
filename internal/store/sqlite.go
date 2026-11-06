@@ -456,6 +456,16 @@ func (s *SQLite) SetState(ctx context.Context, key, value string) error {
 }
 
 // SetAgentConfig sets one config key for an agent; an empty value removes it.
+// SetAgentDelivery changes how an agent gets its messages. Moving a pull agent
+// to a pushed delivery sends whatever is still queued for it.
+func (s *SQLite) SetAgentDelivery(ctx context.Context, name, delivery string) error {
+	if _, err := s.GetAgent(ctx, name); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE agents SET delivery = ? WHERE name = ?`, delivery, name)
+	return err
+}
+
 func (s *SQLite) SetAgentConfig(ctx context.Context, name, key, value string) error {
 	a, err := s.GetAgent(ctx, name)
 	if err != nil {

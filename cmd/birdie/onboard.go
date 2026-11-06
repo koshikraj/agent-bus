@@ -51,6 +51,7 @@ type wizardItem struct {
 	agent            string
 	ticked           bool
 	connected        bool
+	waiting          bool // Grok Bot is registered, but has no webhook yet
 }
 
 // botDetails are the answers for connecting or changing Grok Bot.
@@ -153,6 +154,17 @@ func (w *wizard) run() error {
 		}
 	}
 	failed := w.apply(plan)
+	for _, it := range items {
+		if it.key == itemBot && it.ticked && w.botWaiting() {
+			if err := w.finishBot(it.waiting); err != nil {
+				fmt.Fprintf(w.out, "failed: %v\n", err)
+				failed = append(failed, it.label)
+			}
+		}
+	}
+	if w.ctx.Err() != nil {
+		return nil // interrupted after the changes were applied, so they stand
+	}
 
 	fmt.Fprintln(w.out, "\nHealth check:")
 	printChecks(w.out, runChecks(w.ctx, w.o.db, w.url, w.o.home, w.svc))
@@ -224,9 +236,13 @@ func (w *wizard) items() ([]*wizardItem, []string, error) {
 		}
 	}
 	connected := has(botAgent, "webhook")
-	it := &wizardItem{key: itemBot, label: "Grok Bot", agent: botAgent, ticked: connected, connected: connected, note: "needs its webhook URL and key"}
-	if connected {
+	waiting := has(botAgent, bus.DeliveryPull)
+	it := &wizardItem{key: itemBot, label: "Grok Bot", agent: botAgent, ticked: connected || waiting, connected: connected || waiting, waiting: waiting, note: "gives you a prompt, then asks for its webhook"}
+	switch {
+	case connected:
 		it.note = "connected as " + botAgent
+	case waiting:
+		it.note = "waiting for its webhook URL and key"
 	}
 	items = append(items, it)
 	return items, notFound, nil
@@ -260,18 +276,19 @@ func (w *wizard) askDetails(plan *wizardPlan, items []*wizardItem) error {
 			}
 			plan.hermesWake = &wake
 		case itemBot:
-			fmt.Fprintln(w.out, "\nGrok Bot")
-			if it.connected {
-				change, err := w.p.confirm("Change its webhook URL or key?", false)
-				if err != nil {
-					return err
-				}
-				if !change {
-					continue
-				}
-				plan.connect = append(plan.connect, it)
+			if !it.connected || it.waiting {
+				continue // finishBot asks for these, after the prompt
 			}
-			details, err := w.askBot()
+			fmt.Fprintln(w.out, "\nGrok Bot")
+			change, err := w.p.confirm("Change its webhook URL or key?", false)
+			if err != nil {
+				return err
+			}
+			if !change {
+				continue
+			}
+			plan.connect = append(plan.connect, it)
+			details, err := w.askBot("Webhook URL of the Grok Bot routine", false)
 			if err != nil {
 				return err
 			}
@@ -281,15 +298,19 @@ func (w *wizard) askDetails(plan *wizardPlan, items []*wizardItem) error {
 	return nil
 }
 
-func (w *wizard) askBot() (*botDetails, error) {
+// askBot asks for the webhook URL and key. If optional, leaving the URL empty
+// returns nil.
+func (w *wizard) askBot(question string, optional bool) (*botDetails, error) {
 	d := &botDetails{}
 	for {
-		raw, err := w.p.line("Webhook URL of the Grok Bot routine", "")
+		raw, err := w.p.line(question, "")
 		if err != nil {
 			return nil, err
 		}
-		u, err := neturl.Parse(raw)
-		if err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" {
+		if raw == "" && optional {
+			return nil, nil
+		}
+		if validWebhookURL(raw) {
 			d.url = raw
 			break
 		}
@@ -331,6 +352,11 @@ func (w *wizard) askBot() (*botDetails, error) {
 		}
 		fmt.Fprintln(w.out, "No key entered.")
 	}
+}
+
+func validWebhookURL(raw string) bool {
+	u, err := neturl.Parse(raw)
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != ""
 }
 
 func defaultBotKeyPath() string {
@@ -376,17 +402,18 @@ func (w *wizard) preview(plan wizardPlan) {
 		}
 		switch it.key {
 		case itemBot:
-			verb := "add agent"
-			if it.connected {
-				verb = "update agent"
+			if plan.bot == nil {
+				fmt.Fprintf(w.out, "would add agent %s and save its token to %s\n", botAgent, filepath.Join(tokenDir(), botAgent))
+				fmt.Fprintf(w.out, "would save the routine text to %s\n", routinePath())
+				fmt.Fprintln(w.out, "then gives you a prompt for Grok Bot, and asks for the webhook URL and key it gives you")
+				continue
 			}
-			fmt.Fprintf(w.out, "would %s %s, delivering to %s\n", verb, botAgent, urlHost(plan.bot.url))
+			fmt.Fprintf(w.out, "would update agent %s, delivering to %s\n", botAgent, urlHost(plan.bot.url))
 			if plan.bot.pastedKey != "" {
 				fmt.Fprintf(w.out, "would save the key you pasted to %s\n", plan.bot.keyFile)
 			} else {
 				fmt.Fprintf(w.out, "would read the key from %s\n", plan.bot.keyFile)
 			}
-			fmt.Fprintf(w.out, "would save the routine text to %s\n", routinePath())
 		default:
 			if err := setupOne(w.ctx, it.key, w.toolOptions(it, plan, false), true); err != nil {
 				fmt.Fprintf(w.out, "can't preview: %v\n", err)
@@ -434,7 +461,12 @@ func (w *wizard) apply(plan wizardPlan) (failed []string) {
 		}
 		switch it.key {
 		case itemBot:
-			step(it.label, func() error { return w.applyBot(*plan.bot, it.connected) })
+			step(it.label, func() error {
+				if plan.bot == nil {
+					return w.registerBot()
+				}
+				return w.connectBot(*plan.bot)
+			})
 		default:
 			step(it.label, func() error { return setupOne(w.ctx, it.key, w.toolOptions(it, plan, false), false) })
 		}
@@ -465,6 +497,9 @@ func (w *wizard) deleteAgent(name string) error {
 	}
 	if err := os.Remove(filepath.Join(tokenDir(), name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
+	}
+	if name == botAgent {
+		os.Remove(botPromptPath()) // it holds the token just deleted
 	}
 	fmt.Fprintf(w.out, "deleted agent %s\n", name)
 	return nil
@@ -501,7 +536,31 @@ func (w *wizard) addHeadless(h headlessAgent, cwd string) error {
 	return nil
 }
 
-func (w *wizard) applyBot(d botDetails, existing bool) error {
+// registerBot adds Grok Bot and its token. It has no webhook until the prompt
+// has been used, so it starts as a pull agent, which keeps messages waiting.
+func (w *wizard) registerBot() error {
+	st, err := store.Open(w.o.db)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	err = createAgent(w.ctx, st, bus.Agent{
+		Name: botAgent, Delivery: bus.DeliveryPull, CreatedAt: time.Now().UTC(),
+		Config: map[string]string{
+			"description": "Grok Bot: personal assistant (email, calendar, web); answers in its own time",
+		},
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(w.out, "added agent %s\n", botAgent)
+	r := &setupRun{stamp: w.o.stamp, home: w.o.home}
+	return r.write(routinePath(), birdie.GrokBotRoutine)
+}
+
+// connectBot points Grok Bot at its webhook. Switching its delivery is what
+// sends any messages that were waiting, so it comes last.
+func (w *wizard) connectBot(d botDetails) error {
 	r := &setupRun{stamp: w.o.stamp, home: w.o.home}
 	if d.pastedKey != "" {
 		if err := os.MkdirAll(filepath.Dir(d.keyFile), 0o700); err != nil {
@@ -516,28 +575,65 @@ func (w *wizard) applyBot(d botDetails, existing bool) error {
 		return err
 	}
 	defer st.Close()
-	if existing {
-		if err := st.SetAgentConfig(w.ctx, botAgent, "url", d.url); err != nil {
-			return err
-		}
-		if err := st.SetAgentConfig(w.ctx, botAgent, "auth_file", d.keyFile); err != nil {
-			return err
-		}
-		fmt.Fprintf(w.out, "updated agent %s\n", botAgent)
-	} else {
-		err := createAgent(w.ctx, st, bus.Agent{
-			Name: botAgent, Delivery: "webhook", CreatedAt: time.Now().UTC(),
-			Config: map[string]string{
-				"url": d.url, "auth_file": d.keyFile,
-				"description": "Grok Bot: personal assistant (email, calendar, web); answers in its own time",
-			},
-		})
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(w.out, "added agent %s\n", botAgent)
+	if err := st.SetAgentConfig(w.ctx, botAgent, "url", d.url); err != nil {
+		return err
 	}
-	return r.write(routinePath(), birdie.GrokBotRoutine)
+	if err := st.SetAgentConfig(w.ctx, botAgent, "auth_file", d.keyFile); err != nil {
+		return err
+	}
+	if err := st.SetAgentDelivery(w.ctx, botAgent, "webhook"); err != nil {
+		return err
+	}
+	fmt.Fprintf(w.out, "%s now delivers to %s\n", botAgent, urlHost(d.url))
+	return nil
+}
+
+// botDelivery returns how Grok Bot gets its messages, or "" if it isn't registered.
+func (w *wizard) botDelivery() string {
+	st, err := store.Open(w.o.db)
+	if err != nil {
+		return ""
+	}
+	defer st.Close()
+	a, err := st.GetAgent(w.ctx, botAgent)
+	if err != nil {
+		return ""
+	}
+	return a.Delivery
+}
+
+// botWaiting reports whether Grok Bot is registered but has no webhook yet.
+func (w *wizard) botWaiting() bool { return w.botDelivery() == bus.DeliveryPull }
+
+// finishBot gives the user Grok Bot's prompt, then asks for the webhook URL and
+// key Grok Bot answers with. The changes are applied by now, so stopping here
+// isn't an error: messages wait, and running setup again picks this up.
+func (w *wizard) finishBot(resuming bool) error {
+	later := func() {
+		fmt.Fprintf(w.out, "\nMessages to %s will wait. To finish, run: birdie setup %s\n", botAgent, botAgent)
+		fmt.Fprintf(w.out, "Get the prompt at any time with: birdie agent prompt %s\n", botAgent)
+	}
+	fmt.Fprintln(w.out, "\nFinish Grok Bot:")
+	give := true
+	if resuming {
+		again, err := w.p.confirm("Do you need the prompt for Grok Bot again?", false)
+		if err != nil {
+			later()
+			return nil
+		}
+		give = again
+	}
+	if give && !w.giveBotPrompt() {
+		later()
+		return nil
+	}
+	fmt.Fprintln(w.out, "\nOnce Grok Bot has set up the routine, it will give you the webhook URL and key.")
+	d, err := w.askBot("Webhook URL from Grok Bot, or press Enter to finish later", true)
+	if err != nil || d == nil {
+		later()
+		return nil
+	}
+	return w.connectBot(*d)
 }
 
 func (w *wizard) nextSteps(plan wizardPlan) {
@@ -554,18 +650,38 @@ func (w *wizard) nextSteps(plan wizardPlan) {
 			break
 		}
 	}
-	if plan.bot != nil {
-		steps = append(steps,
-			"In the Grok Bot routine, add the secret BIRDIE_URL = "+defaultURL+".",
-			"Add the secret BIRDIE_TOKEN, pasting the contents of "+filepath.Join(tokenDir(), botAgent)+".",
-			"Paste the routine text from "+routinePath()+" into the routine.",
-		)
+	if len(steps) > 0 {
+		fmt.Fprintln(w.out, "\nWhat's next:")
+		for i, s := range steps {
+			fmt.Fprintf(w.out, "  %d. %s\n", i+1, s)
+		}
 	}
-	if len(steps) == 0 {
-		return
+}
+
+// giveBotPrompt hands over the prompt in the terminal or as a file. It returns
+// false if the user didn't get it.
+func (w *wizard) giveBotPrompt() bool {
+	prompt, err := botPrompt(w.url)
+	if err != nil {
+		fmt.Fprintf(w.out, "Can't build the prompt: %v\n", err)
+		return false
 	}
-	fmt.Fprintln(w.out, "\nWhat's next:")
-	for i, s := range steps {
-		fmt.Fprintf(w.out, "  %d. %s\n", i+1, s)
+	fmt.Fprintln(w.out, "Give Grok Bot one prompt. It has the routine's instructions, the bus address and Grok Bot's token.")
+	show, err := w.p.confirm("Show it here? It includes the token, so No saves it to a private file instead.", false)
+	if err != nil {
+		return false
 	}
+	if show {
+		fmt.Fprintf(w.out, "\n----- Copy from the next line -----\n%s\n----- Copy up to the line above -----\n", prompt)
+		fmt.Fprintln(w.out, "Paste it into a Grok Bot chat. Treat it like a password, because it includes the token.")
+		return true
+	}
+	path, err := saveBotPrompt(prompt)
+	if err != nil {
+		fmt.Fprintf(w.out, "Can't save the prompt: %v\n", err)
+		return false
+	}
+	fmt.Fprintf(w.out, "Saved to %s, where only you can read it.\n", path)
+	fmt.Fprintln(w.out, "Paste or attach it in a Grok Bot chat, then delete the file, because it includes the token.")
+	return true
 }

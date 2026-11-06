@@ -74,12 +74,12 @@ Nothing changes until you confirm. It walks through:
 2. **What to connect:** a checklist of Claude Code, Codex, Grok CLI and Hermes if
    they're on your PATH, plus headless Grok, headless Hermes and Grok Bot, which
    start unticked.
-3. **Details:** whether messages may wake Hermes, a working folder for each
-   headless agent, and Grok Bot's webhook URL and
-   key. Give the path to a file holding the key, or paste it; pasted keys aren't
-   shown, and are saved to `~/.config/grok-bot/sender-key`.
+3. **Details:** whether messages may wake Hermes, and a working folder for each
+   headless agent.
 4. **Changes:** everything it's about to do, for you to confirm.
-5. **Health check:** the same report as `birdie doctor`.
+5. **Grok Bot, if you ticked it:** a prompt to give it, then its webhook URL and
+   key. See [Finish Grok Bot](#4-finish-grok-bot).
+6. **Health check:** the same report as `birdie doctor`.
 
 You can run it again at any time. Agents that are connected start ticked, and
 unticking one disconnects it; that's listed with the changes before you confirm.
@@ -96,6 +96,7 @@ sessions afterwards.
 birdie service install               # the background service
 birdie setup --all                   # every tool found on PATH
 birdie setup claude                  # or just one; add --as NAME, --remove or --dry-run
+birdie setup grok-bot                # Grok Bot, which --all leaves out; see "Finish Grok Bot"
 birdie doctor                        # exits non-zero if something's broken
 ```
 
@@ -136,24 +137,53 @@ session. It has no public docs and could change. If it does, or on Windows, add
 
 ## 4. Finish Grok Bot
 
-If you ticked Grok Bot, onboarding registers it and then lists the steps it can't
-do for you, in the routine's settings:
+If you ticked Grok Bot, onboarding finishes it in this order:
 
-- Add two secrets: `BIRDIE_URL` = `http://127.0.0.1:7777`, and
-  `BIRDIE_TOKEN` = the contents of `~/.config/birdie/tokens/grok-bot`.
-- Paste the routine text saved at `~/.config/birdie/grok-bot-routine.md`. It
-  covers starting conversations, answering messages, and not replying to answers
-  (so bots don't loop).
+1. **It registers `grok-bot`** and creates its token.
+2. **It gives you one prompt.** You choose whether to see it in the terminal or save
+   it to a private file, `~/.config/birdie/grok-bot-prompt.md`. Paste it into a Grok
+   Bot chat.
+3. **Grok Bot sets up the routine.** The prompt has the two secrets the routine needs,
+   `BIRDIE_URL` and `BIRDIE_TOKEN`, and its instructions, which cover starting
+   conversations, answering messages, and not replying to answers (so bots don't
+   loop). Grok Bot then checks that it can reach birdie and gives you the routine's
+   webhook URL and key. If it can't do any of this itself, it tells you where to do it
+   in its settings.
+4. **You enter the webhook URL and key** back in onboarding. Give the path to a file
+   holding the key, or paste it. Pasted keys aren't shown, and are saved to
+   `~/.config/grok-bot/sender-key`.
 
-Messages to `grok-bot` are POSTed to the webhook (retried if it's down). To add it
-without onboarding:
+To stop partway, press Enter at the webhook question. Messages to `grok-bot` wait until
+you finish by running `birdie setup grok-bot`.
+
+The prompt includes the token, so treat it like a password, and delete the file once
+you've used it. Your Grok Bot chat will keep a copy too. To get it again:
 
 ```sh
-birdie agent add grok-bot \
-  --description "Grok Bot: personal assistant (email, calendar, web); answers in its own time" \
-  --webhook https://api2.cursor.sh/automations/webhook/<your-webhook-id> \
-  --auth-file ~/.config/grok-bot/sender-key
+birdie agent prompt grok-bot          # print it
+birdie agent prompt grok-bot --save   # save it to the private file
 ```
+
+Messages to `grok-bot` are POSTed to the webhook (retried if it's down).
+
+To do only this part, without the rest of onboarding, run the same steps on their own:
+
+```sh
+birdie setup grok-bot
+```
+
+In a script, or anywhere with no terminal to ask in, it's two steps, with the prompt in
+between:
+
+```sh
+birdie setup grok-bot                                    # registers it
+birdie agent prompt grok-bot                             # give this to Grok Bot
+birdie setup grok-bot --webhook URL --auth-file PATH     # enter what it gives you
+```
+
+`--webhook` and `--auth-file` also change the webhook later, and keep the token.
+`birdie setup grok-bot --remove` deletes the agent and its token, so its routine would
+need a new token if you reconnect.
 
 ## 5. Try it
 
@@ -265,10 +295,12 @@ birdie serve [--addr 127.0.0.1:7777] [--loop-limit 12]
 birdie onboard
 birdie doctor
 birdie setup claude|codex|grok|hermes|--all [--as NAME] [--remove] [--dry-run] [--wake]
+birdie setup grok-bot [--webhook URL --auth-file PATH] [--remove] [--dry-run]
 birdie service install|remove|status
 birdie agent add NAME [--description TEXT] [--webhook URL --auth-file PATH | --acp "COMMAND" ...]
 birdie agent describe NAME TEXT
 birdie agent list | rm NAME
+birdie agent prompt grok-bot [--save]
 birdie session list | default AGENT [NAME]
 birdie send  --as NAME --to AGENT[/SESSION] MESSAGE
 birdie reply --as NAME MSG_ID MESSAGE

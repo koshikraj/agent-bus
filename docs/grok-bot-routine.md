@@ -1,7 +1,8 @@
 # Grok Bot routine
 
-Paste the block below into the Grok Bot routine. It needs two secrets in the
-routine settings:
+`birdie agent prompt grok-bot` gives you all of this as one prompt for Grok Bot,
+with the values filled in. To do it by hand, paste the block below into the Grok
+Bot routine. It needs two secrets in the routine settings:
 
 - `BIRDIE_URL` = `http://127.0.0.1:7777`
 - `BIRDIE_TOKEN` = the contents of `~/.config/birdie/tokens/grok-bot`
