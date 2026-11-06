@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"birdie/internal/bus"
 	"birdie/internal/store"
 )
 
@@ -20,9 +21,11 @@ type fakePrompter struct {
 	toggle   []string // item keys to flip in the checklist
 	cancel   bool
 	shown    []*wizardItem
+	asked    []string // questions, in order
 }
 
-func (f *fakePrompter) confirm(string, bool) (bool, error) {
+func (f *fakePrompter) confirm(q string, _ bool) (bool, error) {
+	f.asked = append(f.asked, q)
 	if len(f.confirms) == 0 {
 		return false, errors.New("unexpected confirm")
 	}
@@ -32,6 +35,7 @@ func (f *fakePrompter) confirm(string, bool) (bool, error) {
 }
 
 func (f *fakePrompter) line(q, def string) (string, error) {
+	f.asked = append(f.asked, q)
 	if len(f.lines) == 0 {
 		return "", errors.New("unexpected line: " + q)
 	}
@@ -179,11 +183,120 @@ func TestOnboardGrokBotPastedKey(t *testing.T) {
 	if a.Delivery != "webhook" || a.Config["auth_file"] != path {
 		t.Errorf("agent = %+v", a)
 	}
-	for _, want := range []string{"grok-bot-prompt.md", "birdie agent prompt grok-bot"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("next steps lack %q:\n%s", want, out)
-		}
+	if !strings.Contains(out, "grok-bot-prompt.md") {
+		t.Errorf("doesn't say where the prompt is:\n%s", out)
 	}
+}
+
+// The webhook comes from Grok Bot, so it can only be asked for after the prompt.
+func TestOnboardGrokBotAsksForWebhookAfterPrompt(t *testing.T) {
+	o := fakeTools(t)
+	p := botWizard(true, true)
+	out, err := runWizard(t, o, p, noSvc())
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	at := func(q string) int {
+		for i, a := range p.asked {
+			if strings.Contains(a, q) {
+				return i
+			}
+		}
+		t.Fatalf("never asked %q: %q", q, p.asked)
+		return -1
+	}
+	if apply, show, url := at("Apply these changes"), at("Show it here"), at("Webhook URL"); !(apply < show && show < url) {
+		t.Errorf("wrong order: %q", p.asked)
+	}
+	if !strings.Contains(out, "then gives you a prompt") {
+		t.Errorf("the preview doesn't mention the prompt:\n%s", out)
+	}
+	a := botAgentRow(t, o)
+	if a.Delivery != "webhook" || a.Config["url"] != "https://hooks.example.com/1" || a.Config["auth_file"] != defaultBotKeyPath() {
+		t.Errorf("agent = %+v", a)
+	}
+}
+
+// Skipping the webhook keeps the agent and its token, and a rerun picks it up.
+func TestOnboardGrokBotFinishLater(t *testing.T) {
+	o := fakeTools(t)
+	p := &fakePrompter{toggle: []string{itemBot}, lines: []string{""}, confirms: []bool{true, false}}
+	out, err := runWizard(t, o, p, noSvc())
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "run birdie onboard again") {
+		t.Errorf("doesn't say how to finish:\n%s", out)
+	}
+	if !strings.Contains(out, "waiting for its webhook URL and key") {
+		t.Errorf("the health check doesn't mention it:\n%s", out)
+	}
+	if a := botAgentRow(t, o); a.Delivery != "pull" || a.Config["url"] != "" {
+		t.Fatalf("agent = %+v", a)
+	}
+	token := botToken(t)
+
+	// The rerun has it ticked, doesn't resend the prompt unless asked, and finishes.
+	p = &fakePrompter{
+		lines:    []string{"https://hooks.example.com/1", ""},
+		secrets:  []string{"test-key-not-real"},
+		confirms: []bool{false},
+	}
+	out, err = runWizard(t, o, p, noSvc())
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if !p.shown[len(p.shown)-1].ticked {
+		t.Errorf("not ticked on the rerun:\n%s", out)
+	}
+	if strings.Contains(out, token) {
+		t.Errorf("reprinted the token without being asked:\n%s", out)
+	}
+	if a := botAgentRow(t, o); a.Delivery != "webhook" {
+		t.Errorf("agent = %+v", a)
+	}
+	if botToken(t) != token {
+		t.Error("finishing replaced the token, which the routine already has")
+	}
+
+	// Once connected, a rerun asks nothing about the prompt.
+	p = &fakePrompter{confirms: []bool{false}}
+	if out, err := runWizard(t, o, p, noSvc()); err != nil || !strings.Contains(out, "Nothing to change") {
+		t.Errorf("%v\n%s", err, out)
+	}
+}
+
+func TestOnboardGrokBotUntickWhileWaiting(t *testing.T) {
+	o := fakeTools(t)
+	p := &fakePrompter{toggle: []string{itemBot}, lines: []string{""}, confirms: []bool{true, false}}
+	if out, err := runWizard(t, o, p, noSvc()); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	p = &fakePrompter{toggle: []string{itemBot}, confirms: []bool{true}}
+	out, err := runWizard(t, o, p, noSvc())
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if exists(filepath.Join(tokenDir(), botAgent)) || exists(botPromptPath()) {
+		t.Errorf("left the token or prompt behind:\n%s", out)
+	}
+	if strings.Contains(out, "Finish Grok Bot") {
+		t.Errorf("tried to finish an agent it just removed:\n%s", out)
+	}
+}
+
+func botAgentRow(t *testing.T, o setupOptions) bus.Agent {
+	t.Helper()
+	st, err := store.Open(o.db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	a, err := st.GetAgent(context.Background(), botAgent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
 }
 
 // botToken reads the token onboarding generated for Grok Bot.
@@ -344,7 +457,7 @@ func TestOnboardGrokBotKeyFromFileAndRerun(t *testing.T) {
 
 	// Changing the URL keeps the token.
 	p = &fakePrompter{
-		confirms: []bool{true, true, false},
+		confirms: []bool{true, true},
 		lines:    []string{"https://new.example.com/2", keyFile},
 	}
 	if out, err := runWizard(t, o, p, noSvc()); err != nil {
@@ -506,7 +619,7 @@ func TestDoctorNeverPrintsSecrets(t *testing.T) {
 	o := fakeTools(t)
 	keyFile := filepath.Join(o.home, "key")
 	os.WriteFile(keyFile, []byte("key-value-xyz\n"), 0o600)
-	p := &fakePrompter{toggle: []string{itemBot}, lines: []string{"https://hooks.example.com/hidden-path", keyFile}, confirms: []bool{true}}
+	p := &fakePrompter{toggle: []string{itemBot}, lines: []string{"https://hooks.example.com/hidden-path", keyFile}, confirms: []bool{true, false}}
 	if out, err := runWizard(t, o, p, noSvc()); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}

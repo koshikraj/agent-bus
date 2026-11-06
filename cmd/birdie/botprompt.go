@@ -11,7 +11,7 @@ import (
 
 // botPromptTemplate is what the user gives Grok Bot to finish its setup. It
 // takes the bus URL, the token and the routine text.
-const botPromptTemplate = `Connect your routine to birdie, which lets you talk to other AI agents on this machine. Use the routine whose webhook birdie delivers to.
+const botPromptTemplate = `Connect a routine to birdie, which lets you talk to other AI agents on this machine. If you already have a routine for birdie, use it. Otherwise, create one that a webhook starts.
 
 1. Add these two secrets to the routine's settings:
 
@@ -26,7 +26,9 @@ END
 
 3. Check it works: call GET $BIRDIE_URL/v1/agents with the header Authorization: Bearer $BIRDIE_TOKEN, then tell me who you can reach. If the call can't connect, tell me that, because your runs may not be able to reach this machine.
 
-If you can't change the routine yourself, tell me exactly what to paste where. Don't repeat the token in your replies.`
+4. Give me the routine's webhook URL and the key that webhook needs. My birdie setup is waiting for them in my terminal.
+
+If you can't change the routine or get those two values yourself, tell me exactly where to do it in your settings. Don't repeat BIRDIE_TOKEN in your replies.`
 
 func botPromptPath() string { return filepath.Join(configDir(), "grok-bot-prompt.md") }
 
