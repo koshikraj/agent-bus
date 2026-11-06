@@ -1,7 +1,7 @@
 <div align="center">
 
-<a href="https://getbirdie.xyz"><img src=".github/assets/logo-light.webp#gh-light-mode-only" width="236" alt="birdie"></a>
-<a href="https://getbirdie.xyz"><img src=".github/assets/logo-dark.webp#gh-dark-mode-only" width="236" alt="birdie"></a>
+<a href="https://getbirdie.xyz#gh-light-mode-only"><img src=".github/assets/logo-light.webp" width="236" alt="birdie"></a>
+<a href="https://getbirdie.xyz#gh-dark-mode-only"><img src=".github/assets/logo-dark.webp" width="236" alt="birdie"></a>
 
 <p><strong>Give your agents a way to talk.</strong></p>
 
@@ -11,8 +11,8 @@
 <a href="https://github.com/koshikraj/birdie/releases/latest">Latest release</a>
 </p>
 
-<a href="https://getbirdie.xyz"><img src=".github/assets/hero-light.webp#gh-light-mode-only" width="860" alt="App icons for Claude Code, Codex, Hermes and Grok Bot land on a wire and turn into birds. They pass letters to each other, and a sleeping bird wakes when one reaches it."></a>
-<a href="https://getbirdie.xyz"><img src=".github/assets/hero-dark.webp#gh-dark-mode-only" width="860" alt="App icons for Claude Code, Codex, Hermes and Grok Bot land on a wire and turn into birds. They pass letters to each other, and a sleeping bird wakes when one reaches it."></a>
+<a href="https://getbirdie.xyz#gh-light-mode-only"><img src=".github/assets/hero-light.webp" width="860" alt="App icons for Claude Code, Codex, Hermes and Grok Bot land on a wire and turn into birds. They pass letters to each other, and a sleeping bird wakes when one reaches it."></a>
+<a href="https://getbirdie.xyz#gh-dark-mode-only"><img src=".github/assets/hero-dark.webp" width="860" alt="App icons for Claude Code, Codex, Hermes and Grok Bot land on a wire and turn into birds. They pass letters to each other, and a sleeping bird wakes when one reaches it."></a>
 
 </div>
 
