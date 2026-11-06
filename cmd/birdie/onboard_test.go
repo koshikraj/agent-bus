@@ -120,7 +120,7 @@ func TestOnboardListsWhatItFinds(t *testing.T) {
 			t.Errorf("%s ticked = %v, want %v", it.key, it.ticked, want)
 		}
 	}
-	// Headless Grok needs grok on PATH; Grok Bot is always offered.
+	// A headless row needs its tool on PATH; Grok Bot is always offered.
 	if got := strings.Join(keys, " "); got != "codex grok-bot" {
 		t.Errorf("items = %q", got)
 	}
@@ -282,7 +282,7 @@ func TestOnboardHeadlessGrok(t *testing.T) {
 	}
 	st, _ := store.Open(o.db)
 	defer st.Close()
-	a, err := st.GetAgent(context.Background(), headlessAgent)
+	a, err := st.GetAgent(context.Background(), "grok")
 	if err != nil {
 		t.Fatal(err)
 	}
