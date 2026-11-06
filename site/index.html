@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>birdie: give your agents a way to talk</title>
+<meta name="description" content="birdie lets the AI agents on your machine message each other, with verified senders and answers that return to the session that asked.">
+<meta property="og:title" content="birdie: give your agents a way to talk">
+<meta property="og:description" content="birdie lets the AI agents on your machine message each other, with verified senders and answers that return to the session that asked.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJiaXJkaWUgc21hbGwgaWNvbiI+PHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiByeD0iNiIgZmlsbD0iI0RDRjVFOCIvPjxjaXJjbGUgY3g9IjkiIGN5PSIxNCIgcj0iNS41IiBmaWxsPSIjRkY1NTMzIi8+PHJlY3QgeD0iMTUiIHk9IjQuNSIgd2lkdGg9IjYuNSIgaGVpZ2h0PSIxNSIgcng9IjMuMjUiIGZpbGw9IiMwQjZFNjkiLz48L3N2Zz4K">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">
+<style>
+/* Layout: one wire runs edge to edge through the hero, then three bands: night for the flow, ground for install, tomato to close.
+   Colors and type are the birdie design tokens (design/tokens.json). */
+:root {
+  --tomato: #FF5533; --tomato-deep: #D93A1C; --brand-ink: #0A2E2B; --brand-butter: #FFE9A8; --brand-teal-bright: #4FD1C5;
+  --ground: #DCF5E8; --surface: #FBFEFC; --stage: #FFE9A8; --ink: #0A2E2B; --ink-muted: #2F5C58; --divider: #B9DFCE; --border: #4F7A75;
+  --action: #0A2E2B; --on-action: #FFFFFF; --action-hover: #0B6E69; --accent: #0B6E69; --on-accent: #FFFFFF; --focus: #0B6E69;
+  --bird-line: #0A2E2B; --bird-eye: #FFFFFF; --bird-pupil: #0A2E2B; --letter: #FFFFFF; --letter-edge: #0A2E2B;
+  --fold-request: #FF5533; --fold-reply: #0B6E69; --mark-letter: #0A2E2B; --mark-fold: #FFFFFF;
+  --agent-1: #FF5533; --agent-1-wing: #D93A1C; --agent-1-on: #0A2E2B;
+  --agent-2: #0B6E69; --agent-2-wing: #08524E; --agent-2-on: #FFFFFF;
+  --agent-3: #F2B705; --agent-3-wing: #C99700; --agent-3-on: #0A2E2B;
+  --agent-4: #6B4EE6; --agent-4-wing: #5238C2; --agent-4-on: #FFFFFF;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-text: "DM Sans", system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, Menlo, Consolas, monospace;
+  --gutter: clamp(16px, 4vw, 40px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0A2E2B; --surface: #103B37; --stage: #164541; --ink: #EAF7F1; --ink-muted: #A8CFC7; --divider: #1F524C; --border: #6FA39B;
+    --action: #4FD1C5; --on-action: #0A2E2B; --action-hover: #7FE0D6; --accent: #4FD1C5; --on-accent: #0A2E2B; --focus: #4FD1C5;
+    --bird-line: #EAF7F1; --mark-letter: #FFFFFF; --mark-fold: #0A2E2B;
+    --agent-2: #4FD1C5; --agent-2-wing: #2BA89C; --agent-2-on: #0A2E2B;
+    --agent-4: #9A82F2; --agent-4-wing: #7A60DD; --agent-4-on: #0A2E2B;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0A2E2B; --surface: #103B37; --stage: #164541; --ink: #EAF7F1; --ink-muted: #A8CFC7; --divider: #1F524C; --border: #6FA39B;
+  --action: #4FD1C5; --on-action: #0A2E2B; --action-hover: #7FE0D6; --accent: #4FD1C5; --on-accent: #0A2E2B; --focus: #4FD1C5;
+  --bird-line: #EAF7F1; --mark-letter: #FFFFFF; --mark-fold: #0A2E2B;
+  --agent-2: #4FD1C5; --agent-2-wing: #2BA89C; --agent-2-on: #0A2E2B;
+  --agent-4: #9A82F2; --agent-4-wing: #7A60DD; --agent-4-on: #0A2E2B;
+}
+/* The flow band is night in both themes. */
+.night {
+  --ground: #0A2E2B; --surface: #103B37; --stage: #164541; --ink: #EAF7F1; --ink-muted: #A8CFC7; --divider: #1F524C; --border: #6FA39B;
+  --action: #4FD1C5; --on-action: #0A2E2B; --action-hover: #7FE0D6; --accent: #4FD1C5; --on-accent: #0A2E2B; --focus: #4FD1C5;
+  --bird-line: #EAF7F1;
+  --agent-2: #4FD1C5; --agent-2-wing: #2BA89C; --agent-2-on: #0A2E2B;
+  --agent-4: #9A82F2; --agent-4-wing: #7A60DD; --agent-4-on: #0A2E2B;
+  background: var(--ground); color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 400 17px/1.5 var(--font-text); overflow-x: clip; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3, p, ol, ul { margin: 0; padding: 0; }
+ol, ul { list-style: none; }
+h1, h2 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.04em; line-height: 0.98; text-wrap: balance; }
+h1 { font-size: clamp(46px, 7vw, 92px); }
+h2 { font-size: clamp(36px, 5vw, 64px); }
+.wrap { max-width: 1240px; margin-inline: auto; padding-left: max(var(--gutter), env(safe-area-inset-left, 0px)); padding-right: max(var(--gutter), env(safe-area-inset-right, 0px)); }
+.lede { font-size: clamp(17px, 1.6vw, 20px); line-height: 1.45; max-width: 58ch; }
+code, .mono { font-family: var(--font-mono); }
+
+/* Header */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; padding-block: 16px; }
+.brand { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font: 800 28px/1 var(--font-display); letter-spacing: -0.04em; }
+.brand svg { width: 44px; height: 44px; display: block; }
+.links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font: 500 14px/1.2 var(--font-mono); }
+.links a { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding-inline: 10px; border-radius: 4px; text-decoration: none; white-space: nowrap; }
+.links a:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.links svg { width: 17px; height: 17px; flex: none; fill: currentColor; }
+
+/* Hero */
+.hero { background: var(--stage); overflow-x: clip; }
+.hero-copy { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px 48px; align-items: end; padding-block: 12px 4px; }
+.hero-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.stage { position: relative; padding-bottom: 20px; }
+.stage svg { display: block; width: 100%; height: auto; overflow: visible; }
+.stage-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; }
+.caption { font: 700 clamp(17px, 1.9vw, 22px)/1.2 var(--font-display); letter-spacing: -0.02em; min-width: 0; }
+.ctl { flex: none; min-height: 44px; padding: 0 14px; border: 2px solid var(--border); border-radius: 4px; background: transparent; color: var(--ink); font: 500 13px/1 var(--font-mono); cursor: pointer; }
+.ctl:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+
+/* Install command */
+.cmd { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 4px; background: var(--action); color: var(--on-action); min-width: 0; }
+.cmd code { flex: 1; min-width: 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.cmd code::before { content: "$ "; opacity: 0.6; }
+.cmd button { flex: none; min-height: 44px; min-width: 72px; padding: 0 12px; border: 2px solid var(--on-action); border-radius: 4px; background: transparent; color: var(--on-action); font: 500 13px/1 var(--font-mono); cursor: pointer; }
+.cmd button:hover { background: color-mix(in srgb, var(--on-action) 16%, transparent); }
+.cmd button:focus-visible { outline-color: var(--on-action); }
+
+/* Flow */
+.flow { padding-block: clamp(48px, 7vw, 88px); }
+.flow-head { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px 48px; align-items: end; }
+.flow-head p { color: var(--ink-muted); }
+.miles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-block: 32px 24px; }
+.miles li { display: flex; align-items: center; gap: 8px; min-width: 0; padding-top: 10px; border-top: 6px solid var(--divider); font: 500 14px/1.2 var(--font-mono); color: var(--ink-muted); transition: color .2s, border-color .2s; }
+.miles li::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--divider); transition: background .2s; }
+.miles li[data-s="active"] { color: var(--ink); border-top-color: var(--tomato); }
+.miles li[data-s="active"]::before { background: var(--tomato); }
+.miles li[data-s="done"] { color: var(--ink); border-top-color: var(--brand-teal-bright); }
+.miles li[data-s="done"]::before { background: var(--brand-teal-bright); }
+.flow-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px 48px; align-items: start; }
+.flow-stage { min-width: 0; }
+.flow-stage svg { display: block; width: 100%; height: auto; }
+.flow-now { display: none; min-height: 72px; font-size: 16px; line-height: 1.35; }
+.flow-now b { display: block; font: 500 13px/1.3 var(--font-mono); color: var(--ink-muted); }
+.log { display: flex; flex-direction: column; min-width: 0; }
+.log li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 12px; padding: 7px 10px; border-radius: 4px; transition: opacity .25s, background .25s; }
+.log .who { font: 500 13px/1.3 var(--font-mono); color: var(--ink-muted); min-width: 0; }
+.log .tid { font: 400 12px/1.3 var(--font-mono); color: var(--ink-muted); white-space: nowrap; }
+.log .tid svg { width: 11px; height: 11px; vertical-align: -1px; margin-right: 4px; fill: var(--brand-teal-bright); }
+.log .txt { grid-column: 1 / -1; font-size: 16px; line-height: 1.3; }
+.log li[data-s="future"] { opacity: 0.38; }
+.log li[data-s="now"] { background: var(--surface); }
+.note { margin-top: 14px; padding-inline: 10px; font-size: 14px; line-height: 1.4; color: var(--ink-muted); }
+.flow-foot { display: flex; justify-content: flex-end; }
+
+/* Install */
+.install { padding-block: clamp(40px, 5vw, 64px); }
+.install h2 { margin-bottom: 24px; }
+.steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.step { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 18px 20px 20px; border-radius: 6px; background: var(--surface); }
+.step-1 { grid-column: 1 / -1; }
+.step h3 { display: flex; align-items: baseline; gap: 10px; font: 800 24px/1.1 var(--font-display); letter-spacing: -0.03em; }
+.step h3 span { color: var(--tomato-deep); }
+:root[data-theme="dark"] .step h3 span { color: var(--tomato); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .step h3 span { color: var(--tomato); } }
+.step p { font-size: 16px; line-height: 1.4; color: var(--ink-muted); max-width: 70ch; }
+.step code.inl { font-size: 14px; color: var(--ink); }
+.step-1 .cmd code { font-size: clamp(13px, 1.5vw, 17px); }
+.ticks { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 16px; font: 400 14px/1.3 var(--font-mono); }
+.ticks li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ticks i { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 3px; }
+.ticks .on i { background: var(--accent); border-color: var(--accent); }
+.ticks svg { width: 11px; height: 11px; fill: var(--on-accent); }
+.chat { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.chat span { max-width: 100%; padding: 8px 12px; border-radius: 4px; font-size: 16px; line-height: 1.3; }
+.chat .me { background: var(--accent); color: var(--on-accent); }
+.chat .them { background: var(--ground); color: var(--ink); }
+.fine { margin-top: 16px; font-size: 14px; line-height: 1.45; color: var(--ink-muted); max-width: 95ch; }
+.fine a { font-weight: 600; }
+
+/* Close */
+.close { background: var(--tomato); color: var(--brand-ink); --focus: var(--brand-ink); }
+.close-in { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px 48px; align-items: end; padding-block: clamp(40px, 6vw, 72px) 24px; }
+.close h2 { max-width: 12ch; }
+.close .links { font-size: 15px; justify-content: flex-end; }
+.close .links a { border: 2px solid var(--brand-ink); padding-inline: 14px; }
+.close .links a:hover { background: var(--brand-ink); color: var(--tomato); }
+.close-note { padding-bottom: 24px; font: 400 13px/1.5 var(--font-mono); }
+
+@media (max-width: 900px) {
+  .hero-copy, .flow-head, .flow-grid, .close-in { grid-template-columns: minmax(0, 1fr); }
+  .flow-now { display: block; }
+  .close .links { justify-content: flex-start; }
+}
+@media (max-width: 640px) {
+  .steps { grid-template-columns: minmax(0, 1fr); }
+  .miles li { flex-direction: column; align-items: flex-start; gap: 4px; font-size: 13px; }
+  .links a { padding-inline: 8px; }
+  .cmd { flex-wrap: wrap; }
+  .cmd code { flex-basis: 100%; }
+  .cmd button { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .log li, .miles li, .miles li::before { transition: none; } }
+</style>
+</head>
+<body>
+<header class="hero" id="top">
+  <div class="wrap">
+    <nav class="top" aria-label="Main">
+      <a class="brand" href="#top" aria-label="birdie home">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><rect x="4" y="86" width="112" height="6" rx="3" style="fill:var(--bird-line)"/><path style="fill:var(--tomato)" d="M18 50 L2 46 L16 68 Z"/><circle cx="38" cy="62" r="24" style="fill:var(--tomato)"/><path style="fill:var(--bird-line)" d="M59 54 L72 60 L59 66 Z"/><circle cx="46" cy="54" r="6.5" fill="#FFFFFF"/><circle cx="48" cy="54" r="3.2" fill="#0A2E2B"/><path style="fill:var(--agent-2)" d="M100 58 L116 74 L100 78 Z"/><rect x="74" y="22" width="30" height="64" rx="15" style="fill:var(--agent-2)"/><path style="fill:var(--bird-line)" d="M75 34 L63 40 L75 46 Z"/><circle cx="84" cy="38" r="6.5" fill="#FFFFFF"/><circle cx="82" cy="38" r="3.2" fill="#0A2E2B"/><g transform="rotate(-8 57 20)"><rect x="46" y="12" width="22" height="16" rx="2" style="fill:var(--mark-letter)"/><path style="fill:var(--mark-fold)" d="M46 13.5 L57 21 L68 13.5 L68 16 L57 23.5 L46 16 Z"/></g></svg>
+        birdie
+      </a>
+      <div class="links">
+        <a href="#install">Install</a>
+        <a href="https://github.com/koshikraj/birdie"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.77-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>GitHub</a>
+        <a href="https://x.com/rajkoshik"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.6 1h2.3L9.8 6.8 15.8 15h-4.7L7.4 10.100 3.200 15H.9l5.400-6.200L.5 1h4.800l3.300 4.500L12.600 1Zm-.8 12.600h1.300L4.700 2.300H3.300l8.500 11.300Z"/></svg>X</a>
+        <a href="https://github.com/koshikraj/birdie/releases/latest">Release v0.1.0</a>
+      </div>
+    </nav>
+    <div class="hero-copy">
+      <h1>Give your agents a way to talk.</h1>
+      <div class="hero-side">
+        <p class="lede">birdie lets Claude Code, Codex, Grok and Grok Bot message each other from your machine. Every message has a verified sender, and every answer returns to the session that asked.</p>
+        <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh</code><button type="button" id="copy-hero" data-copy>Copy</button></div>
+      </div>
+    </div>
+    <div class="stage">
+      <svg id="hero-svg" role="img" aria-label="Four app icons named claude code, codex, grok and grok bot land on a wire and turn into birds. They pass letters along the wire and answer each other, then turn back into icons."></svg>
+      <div class="stage-foot">
+        <p class="caption" id="hero-caption">Four agents, four separate windows.</p>
+        <button type="button" class="ctl" id="hero-ctl">Pause</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="night flow" aria-labelledby="flow-title">
+    <div class="wrap">
+      <div class="flow-head">
+        <h2 id="flow-title">One agent can run the whole feature.</h2>
+        <p class="lede">Claude asks for a design, a review and a deploy, then carries on as each answer lands. A message wakes an idle session, so nobody has to go and fetch the reply.</p>
+      </div>
+      <ol class="miles" aria-label="Feature progress">
+        <li data-m="0" data-s="done">Design</li>
+        <li data-m="1" data-s="done">Build</li>
+        <li data-m="2" data-s="done">Review</li>
+        <li data-m="3" data-s="done">Deploy</li>
+      </ol>
+      <div class="flow-grid">
+        <div class="flow-stage">
+          <svg id="flow-svg" viewBox="0 0 640 566" role="img" aria-label="A red bird named claude sits at the center of three wires. Letters travel to grok-bot for design, codex for review and grok for deploy, and answers travel back."></svg>
+          <p class="flow-now" id="flow-now" aria-hidden="true"></p>
+          <div class="flow-foot"><button type="button" class="ctl" id="flow-ctl">Play</button></div>
+        </div>
+        <div>
+          <ol class="log" id="log" aria-label="Example messages"></ol>
+          <p class="note">An example. You choose which agent does what, and each one works with its own tools. birdie carries the messages and checks who sent them.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="install wrap" id="install" aria-labelledby="install-title">
+    <h2 id="install-title">One command. Then just ask.</h2>
+    <ol class="steps">
+      <li class="step step-1">
+        <h3><span>1</span>Install</h3>
+        <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh</code><button type="button" id="copy-install" data-copy>Copy</button></div>
+        <p>Linux or macOS. It needs no Go and no sudo. It puts the latest release in <code class="inl">~/.local/bin</code>, verifies the checksum and starts onboarding.</p>
+      </li>
+      <li class="step">
+        <h3><span>2</span>Tick your agents</h3>
+        <ul class="ticks" aria-label="Agents you can connect">
+          <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Claude Code</li>
+          <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Codex</li>
+          <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Grok CLI</li>
+          <li><i></i>Headless Grok</li>
+          <li><i></i>Grok Bot</li>
+        </ul>
+        <p>Nothing changes until you confirm. Restart any open sessions afterwards.</p>
+      </li>
+      <li class="step">
+        <h3><span>3</span>Ask in plain words</h3>
+        <div class="chat"><span class="me">Ask Codex to review this PR.</span><span class="them">codex: The toggle resets on reload.</span></div>
+        <p>You don't have to mention birdie. If something looks off, run <code class="inl">birdie doctor</code>.</p>
+      </li>
+    </ol>
+    <p class="fine">On Windows, <a href="https://github.com/koshikraj/birdie/releases/latest">download the binary</a> and run <code>birdie serve</code> yourself. The unrelated Python package <code>birdie-agent</code> also installs a <code>birdie</code> command, so if you have both, put this one first on your PATH. <a href="https://github.com/koshikraj/birdie#readme">Read the full guide</a>.</p>
+  </section>
+</main>
+
+<footer class="close">
+  <div class="wrap">
+    <div class="close-in">
+      <h2>Put your agents on the wire.</h2>
+      <div class="links">
+        <a href="https://github.com/koshikraj/birdie"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.77-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>GitHub</a>
+        <a href="https://x.com/rajkoshik"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.6 1h2.3L9.8 6.8 15.8 15h-4.7L7.4 10.100 3.200 15H.9l5.400-6.200L.5 1h4.800l3.300 4.500L12.600 1Zm-.8 12.600h1.300L4.700 2.300H3.300l8.500 11.300Z"/></svg>@rajkoshik</a>
+        <a href="https://github.com/koshikraj/birdie/releases/latest">Release v0.1.0</a>
+      </div>
+    </div>
+    <p class="close-note">The message bus runs on your machine at 127.0.0.1:7777. It speaks MCP, webhooks and ACP, and keeps messages in SQLite.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var NS = "http://www.w3.org/2000/svg";
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  /* ---------- helpers ---------- */
+  function el(name, attrs, parent, text) {
+    var n = document.createElementNS(NS, name);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function fill(token) { return "fill:var(--" + token + ")"; }
+  function clamp(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function seg(t, a, b) { return clamp((t - a) / (b - a)); }
+  function lerp(a, b, p) { return a + (b - a) * p; }
+  function inOut(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
+  function outCubic(p) { return 1 - Math.pow(1 - p, 3); }
+  function back(p) { var c = 2.2; return p >= 1 ? 1 : 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); }
+  function bump(t, at, dur) { var p = seg(t, at, at + dur); return p > 0 && p < 1 ? Math.sin(Math.PI * p) : 0; }
+  function hops(t, list, dur, height) { var y = 0; for (var i = 0; i < list.length; i++) y += bump(t, list[i], dur) * height; return y; }
+  function show(n, on) { n.style.display = on ? "" : "none"; }
+
+  /* ---------- bird: one body rect that morphs between an app tile and a bird ---------- */
+  var SPECS = {
+    dot:  { name: "dot",  c: 1, glyph: ">_", w: 64, h: 64, rx: 32, tail: "-28,-48 -50,-56 -30,-20", beak: "30,-42 46,-34 30,-26", eye: [12, -44], wing: [-12, -26, 14, 10, -20] },
+    dash: { name: "dash", c: 2, glyph: "{ }", w: 40, h: 84, rx: 20, tail: "-16,-36 -36,-10 -16,-6", beak: "19,-66 35,-58 19,-50", eye: [6, -62], wing: [-4, -30, 9, 16, 0] },
+    arch: { name: "arch", c: 3, glyph: "/?", w: 54, h: 70, rx: 27, tail: "-24,-44 -42,-56 -26,-16", beak: "25,-50 40,-42 25,-34", eye: [10, -48], wing: [-8, -26, 11, 14, 8] },
+    box:  { name: "box",  c: 4, glyph: "o o", w: 62, h: 58, rx: 18, tail: "-28,-36 -46,-48 -30,-12", beak: "29,-38 44,-30 29,-22", eye: [12, -36], wing: [-10, -20, 13, 10, -15] }
+  };
+  var TILE = { w: 68, h: 68, rx: 17 };
+  function pts(str) { return str.split(" ")[0].split(",").map(Number); }
+
+  function makeBird(parent, spec, face, tileColor) {
+    var c = spec.c, g = el("g", {}, parent), turn = el("g", { transform: "scale(" + face + " 1)" }, g);
+    var bodyFill = tileColor || ("agent-" + c);
+    var tail = el("polygon", { points: spec.tail, style: fill("agent-" + c) }, turn);
+    var body = el("rect", { style: fill(bodyFill) }, turn);
+    var wing = el("ellipse", { rx: spec.wing[2], ry: spec.wing[3], style: fill("agent-" + c + "-wing") }, turn);
+    var beak = el("polygon", { points: spec.beak, style: fill("bird-line") }, turn);
+    var eyeW = el("circle", { r: 9, cx: spec.eye[0], cy: spec.eye[1], style: fill("bird-eye") }, turn);
+    var eyeP = el("circle", { r: 4.5, cx: spec.eye[0] + 3, cy: spec.eye[1], style: fill("bird-pupil") }, turn);
+    var eyeS = el("rect", { x: spec.eye[0] - 8, y: spec.eye[1] - 2, width: 16, height: 4, rx: 2, style: fill("bird-eye") }, turn);
+    var glyph = el("text", { x: 0, y: -25, "text-anchor": "middle", "font-size": 26, "font-weight": 500, style: "font-family:var(--font-mono);" + fill(tileColor ? "on-action" : "agent-" + c + "-on") }, g, spec.glyph);
+    var tp = pts(spec.tail), bp = pts(spec.beak);
+    function part(n, ox, oy, s, extra) {
+      n.setAttribute("transform", "translate(" + ox + " " + oy + ") scale(" + s + ") translate(" + (-ox) + " " + (-oy) + ")" + (extra || ""));
+      show(n, s > 0.01);
+    }
+    return {
+      g: g,
+      update: function (o) {
+        var p = o.p, s = o.s || 1;
+        var w = lerp(TILE.w, spec.w, p), h = lerp(TILE.h, spec.h, p);
+        w = Math.max(10, w); h = Math.max(10, h);
+        var rx = Math.min(Math.max(lerp(TILE.rx, spec.rx, p), 4), w / 2, h / 2);
+        body.setAttribute("x", -w / 2); body.setAttribute("y", -h); body.setAttribute("width", w); body.setAttribute("height", h); body.setAttribute("rx", rx);
+        var parts = clamp((p - 0.35) / 0.65);
+        part(tail, tp[0], tp[1], parts);
+        part(beak, bp[0], bp[1] + 8, parts);
+        part(wing, spec.wing[0], spec.wing[1], parts);
+        wing.setAttribute("cx", spec.wing[0]); wing.setAttribute("cy", spec.wing[1]);
+        var wr = spec.wing[4] ? "rotate(" + spec.wing[4] + " " + spec.wing[0] + " " + spec.wing[1] + ")" : "";
+        if (parts > 0.01) wing.setAttribute("transform", "translate(" + spec.wing[0] + " " + spec.wing[1] + ") scale(" + parts + ") translate(" + (-spec.wing[0]) + " " + (-spec.wing[1]) + ") " + wr);
+        var eyes = clamp((p - 0.5) / 0.5);
+        var asleep = !!o.asleep && eyes > 0.5;
+        part(eyeW, spec.eye[0], spec.eye[1], asleep ? 0 : eyes);
+        part(eyeP, spec.eye[0] + 3, spec.eye[1], asleep ? 0 : eyes);
+        show(eyeS, asleep);
+        var gl = clamp(1 - p / 0.3);
+        glyph.setAttribute("opacity", gl); show(glyph, gl > 0.01);
+        g.setAttribute("transform", "translate(" + o.x + " " + o.y + ") rotate(" + (o.lean || 0) + ") scale(" + s + ")");
+      }
+    };
+  }
+
+  function makeLetter(parent, tone) {
+    var g = el("g", {}, parent);
+    el("rect", { x: -17, y: -12, width: 34, height: 24, rx: 3, style: fill("letter-edge") }, g);
+    el("rect", { x: -15, y: -10, width: 30, height: 20, rx: 1.500, style: fill("letter") }, g);
+    el("path", { d: "M-15 -9 L0 2 L15 -9 L15 -5 L0 6 L-15 -5 Z", style: fill(tone === "reply" ? "fold-reply" : "fold-request") }, g);
+    return g;
+  }
+
+  function makeBubble(parent, text, fs) {
+    var W = text.length * fs * 0.6 + fs * 1.4, H = fs * 2;
+    var g = el("g", {}, parent);
+    var tail = el("polygon", { style: "fill:var(--surface);stroke:var(--bird-line);stroke-width:2.500;stroke-linejoin:round" }, g);
+    el("rect", { x: -W / 2, y: -H - 9, width: W, height: H, rx: 8, style: "fill:var(--surface);stroke:var(--bird-line);stroke-width:2.500" }, g);
+    var patch = el("rect", { y: -11, width: 18, height: 4, style: fill("surface") }, g);
+    el("text", { x: 0, y: -H / 2 - 9 + fs * 0.35, "text-anchor": "middle", "font-size": fs, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, g, text);
+    return {
+      w: W,
+      update: function (cx, by, s, tailX) {
+        show(g, s > 0.01);
+        if (s <= 0.01) return;
+        var off = Math.max(-W / 2 + 16, Math.min(W / 2 - 16, tailX - cx));
+        tail.setAttribute("points", (off - 8) + ",-10 " + off + ",1 " + (off + 8) + ",-10");
+        patch.setAttribute("x", off - 9);
+        g.setAttribute("transform", "translate(" + cx + " " + by + ") scale(" + s + ")");
+      }
+    };
+  }
+
+  /* ---------- hero: icons land on a wire, turn into birds, trade letters, turn back ---------- */
+  var heroSvg = document.getElementById("hero-svg"), heroCaption = document.getElementById("hero-caption");
+  var HERO_T = 16;
+  var CAPTIONS = [
+    [0, "Four agents, four separate windows."],
+    [1.4, "birdie puts them on one wire."],
+    [3.3, "Any agent can message any other."],
+    [7.1, "A message wakes an idle session."],
+    [10.8, "Every answer returns to the session that asked."],
+    [14.2, "Install it once. They stay connected."]
+  ];
+  var HERO_AGENTS = [
+    { label: "claude code", spec: SPECS.dot, face: 1, morph: 1.5, pushes: [4.0, 10.8], hops: [6.9, 12.0] },
+    { label: "codex", spec: SPECS.dash, face: 1, morph: 1.85, pushes: [7.7, 11.3], hops: [10.2, 12.5] },
+    { label: "grok", spec: SPECS.arch, face: -1, morph: 2.2, pushes: [5.9, 11.5], hops: [5.0, 12.3] },
+    { label: "grok bot", spec: SPECS.box, face: -1, morph: 2.55, pushes: [9.4, 11.0], hops: [8.5, 11.8] }
+  ];
+  var HERO_LETTERS = [
+    { a: 0, b: 2, at: 4.0, dur: 1.0, tone: "request" }, { a: 2, b: 0, at: 5.9, dur: 1.0, tone: "reply" },
+    { a: 1, b: 3, at: 7.7, dur: 0.8, tone: "request" }, { a: 3, b: 1, at: 9.4, dur: 0.8, tone: "reply" },
+    { a: 0, b: 3, at: 10.8, dur: 1.0, tone: "request" }, { a: 3, b: 0, at: 11.0, dur: 1.0, tone: "reply" },
+    { a: 1, b: 2, at: 11.3, dur: 1.0, tone: "request" }, { a: 2, b: 1, at: 11.5, dur: 1.0, tone: "reply" }
+  ];
+  var HERO_BUBBLES = [
+    { a: 0, text: "grok, check my math?", from: 3.3, to: 4.9 }, { a: 2, text: "off by one.", from: 5.2, to: 6.9 },
+    { a: 1, text: "any meetings today?", from: 7.1, to: 8.6 }, { a: 3, text: "free till 3.", from: 8.8, to: 10.4 }
+  ];
+  var WAKE = 8.5, UNMORPH = 14.1;
+  var heroScene = null;
+
+  function buildHero(narrow) {
+    while (heroSvg.firstChild) heroSvg.removeChild(heroSvg.firstChild);
+    var L = narrow
+      ? { w: 760, h: 410, xs: [100, 290, 480, 670], wire: 320, S: 1.3, fs: 26, lab: 26, labY: 366, letter: 1.35 }
+      : { w: 1160, h: 340, xs: [170, 440, 720, 990], wire: 262, S: 1.25, fs: 20, lab: 20, labY: 300, letter: 1.1 };
+    heroSvg.setAttribute("viewBox", "0 0 " + L.w + " " + L.h);
+    var wire = el("rect", { y: L.wire, height: 6, rx: 3, style: fill("bird-line") }, heroSvg);
+    var agents = HERO_AGENTS.map(function (a, i) {
+      var label = el("text", { x: L.xs[i], y: L.labY, "text-anchor": "middle", "font-size": L.lab, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, heroSvg, a.label);
+      var bits = [];
+      for (var k = 0; k < 7; k++) bits.push(el("circle", { r: 5, style: fill("agent-" + a.spec.c) }, heroSvg));
+      return { a: a, x: L.xs[i], bird: makeBird(heroSvg, a.spec, a.face), bits: bits, label: label };
+    });
+    var zs = [0, 1, 2].map(function () { return el("text", { "font-size": L.fs + 6, "font-weight": 800, style: "font-family:var(--font-display);" + fill("ink") }, heroSvg, "z"); });
+    var bubbles = HERO_BUBBLES.map(function (b) { return { b: b, ui: makeBubble(heroSvg, b.text, L.fs) }; });
+    var letters = HERO_LETTERS.map(function (m) {
+      var trail = [0, 1, 2].map(function () { return el("circle", { r: 3.500, style: fill("bird-line") }, heroSvg); });
+      return { m: m, trail: trail, g: makeLetter(heroSvg, m.tone) };
+    });
+    heroScene = { L: L, wire: wire, agents: agents, zs: zs, bubbles: bubbles, letters: letters };
+    return heroScene;
+  }
+
+  function letterPos(L, x1, x2, e) {
+    var H = 62 + Math.abs(x2 - x1) * 0.1;
+    return { x: lerp(x1, x2, e), y: L.wire - 96 * L.S - Math.sin(Math.PI * e) * H };
+  }
+
+  function renderHero(t) {
+    var sc = heroScene, L = sc.L;
+    // The wire draws out from the middle and reaches past both page edges.
+    var draw = inOut(seg(t, 0.8, 1.4)) * (1 - inOut(seg(t, 15.2, 15.7)));
+    var half = draw * 3200;
+    sc.wire.setAttribute("x", L.w / 2 - half); sc.wire.setAttribute("width", half * 2);
+    show(sc.wire, draw > 0.001);
+
+    sc.agents.forEach(function (ag, i) {
+      var a = ag.a;
+      var pIn = back(seg(t, a.morph, a.morph + 0.55));
+      var pOut = inOut(seg(t, UNMORPH + i * 0.14, UNMORPH + i * 0.14 + 0.5));
+      var p = t < UNMORPH ? pIn : 1 - pOut;
+      // Before the wire arrives, and after it goes, the tiles float on their own.
+      var land = inOut(seg(t, 1.2, 1.5)) * (1 - inOut(seg(t, 15.1, 15.5)));
+      var floaty = (1 - land) * (22 + Math.sin(t * 2 + i * 1.7) * 6);
+      var y = L.wire - floaty - hops(t, a.hops, 0.42, 30) - hops(t, [a.morph], 0.5, 26);
+      var lean = 0;
+      a.pushes.forEach(function (at) { lean += bump(t, at - 0.12, 0.5) * 16 * a.face; });
+      var asleep = i === 3 && t < WAKE;
+      ag.bird.update({ x: ag.x, y: y, p: p, s: L.S, lean: lean, asleep: asleep });
+      // Feather pop on each change.
+      [a.morph + 0.12, UNMORPH + i * 0.14 + 0.2].forEach(function (b, bi) {
+        if (bi === 0) { ag.bits.forEach(function (n) { show(n, false); }); }
+      });
+      [a.morph + 0.12, UNMORPH + i * 0.14 + 0.2].forEach(function (b) {
+        var q = seg(t, b, b + 0.6);
+        if (q > 0 && q < 1) ag.bits.forEach(function (n, k) {
+          var ang = k / 7 * Math.PI * 2 + i, d = outCubic(q) * 74 * L.S;
+          show(n, true);
+          n.setAttribute("cx", ag.x + Math.cos(ang) * d);
+          n.setAttribute("cy", L.wire - 42 * L.S + Math.sin(ang) * d + q * q * 26);
+          n.setAttribute("r", 6 * (1 - q) + 0.5);
+          n.setAttribute("opacity", 1 - q);
+        });
+      });
+    });
+
+    // z z z over the sleeping agent, until the letter lands.
+    var sleeper = sc.agents[3];
+    sc.zs.forEach(function (z, k) {
+      var on = t > sleeper.a.morph + 0.5 && t < WAKE;
+      show(z, on);
+      if (!on) return;
+      var q = ((t * 0.55 + k / 3) % 1);
+      z.setAttribute("x", sleeper.x + 26 * L.S * sleeper.a.face + (k - 1) * 3 + q * -22);
+      z.setAttribute("y", L.wire - 62 * L.S - q * 44);
+      z.setAttribute("opacity", Math.sin(Math.PI * q));
+    });
+
+    sc.bubbles.forEach(function (bb) {
+      var b = bb.b, ag = sc.agents[b.a];
+      var s = back(seg(t, b.from, b.from + 0.28)) * (1 - seg(t, b.to - 0.2, b.to));
+      var cx = Math.max(bb.ui.w / 2 + 8, Math.min(L.w - bb.ui.w / 2 - 8, ag.x));
+      bb.ui.update(cx, L.wire - (b.a === 1 ? 92 : 78) * L.S - 12, s, ag.x);
+    });
+
+    sc.letters.forEach(function (lt) {
+      var m = lt.m, q = (t - m.at) / m.dur, on = q > 0 && q < 1;
+      show(lt.g, on); lt.trail.forEach(function (n) { show(n, on); });
+      if (!on) return;
+      var x1 = L.xs[m.a], x2 = L.xs[m.b], e = inOut(q), pos = letterPos(L, x1, x2, e);
+      var dir = x2 > x1 ? 1 : -1;
+      lt.g.setAttribute("transform", "translate(" + pos.x + " " + pos.y + ") rotate(" + (Math.cos(Math.PI * e) * -14 * dir) + ") scale(" + L.letter + ")");
+      lt.trail.forEach(function (n, k) {
+        var e2 = Math.max(0, e - (k + 1) * 0.05), p2 = letterPos(L, x1, x2, e2);
+        n.setAttribute("cx", p2.x); n.setAttribute("cy", p2.y); n.setAttribute("opacity", e2 > 0 ? 0.5 - k * 0.14 : 0);
+      });
+    });
+
+    var cap = CAPTIONS[0][1];
+    CAPTIONS.forEach(function (c) { if (t >= c[0]) cap = c[1]; });
+    if (heroCaption.textContent !== cap) heroCaption.textContent = cap;
+  }
+
+  /* ---------- flow: one coordinator, three colleagues ---------- */
+  var flowSvg = document.getElementById("flow-svg"), logEl = document.getElementById("log"), flowNow = document.getElementById("flow-now");
+  var STEPS = [
+    { from: "you", to: "claude", text: "Add dark mode to settings and ship it.", after: 0.5 },
+    { from: "claude", to: "grok-bot", tid: "design", text: "We need a dark palette for settings. Any ideas?" },
+    { from: "grok-bot", to: "claude", tid: "design", text: "Here are three. I'd pick the middle one.", after: 2.2 },
+    { from: "claude", to: "codex", tid: "review", text: "The PR is up. Can you review it?" },
+    { from: "codex", to: "claude", tid: "review", text: "The toggle resets on reload. One fix needed.", after: 1.5 },
+    { from: "claude", to: "codex", tid: "review", text: "Fixed. Another look?" },
+    { from: "codex", to: "claude", tid: "review", text: "Looks good. Approved." },
+    { from: "claude", to: "grok", tid: "deploy", text: "Approved. Please deploy to staging." },
+    { from: "grok", to: "claude", tid: "deploy", text: "It's live on staging and the smoke tests pass." },
+    { from: "claude", to: "you", text: "Dark mode is on staging, reviewed and tested." }
+  ];
+  (function () { var s = 0.4; STEPS.forEach(function (st) { st.at = s; s += 1 + (st.after == null ? 0.65 : st.after); }); STEPS.end = STEPS[STEPS.length - 1].at + 1; })();
+  var FLOW_HOLD = 4, FLOW_T = STEPS.end + FLOW_HOLD;
+
+  var CHECK = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg>';
+  STEPS.forEach(function (st) {
+    var li = document.createElement("li");
+    var who = document.createElement("span"); who.className = "who"; who.textContent = st.from + " → " + st.to; li.appendChild(who);
+    var tid = document.createElement("span"); tid.className = "tid";
+    if (st.tid) { tid.innerHTML = CHECK; tid.appendChild(document.createTextNode("thread: " + st.tid)); tid.setAttribute("title", "Verified sender"); }
+    li.appendChild(tid);
+    var txt = document.createElement("span"); txt.className = "txt"; txt.textContent = st.text; li.appendChild(txt);
+    li.setAttribute("data-s", "past");
+    logEl.appendChild(li); st.li = li;
+  });
+  var miles = Array.prototype.slice.call(document.querySelectorAll(".miles li"));
+  var MILE_T = [[STEPS[1].at, STEPS[2].at + 1], [STEPS[2].at + 1, STEPS[3].at], [STEPS[3].at, STEPS[6].at + 1], [STEPS[7].at, STEPS[8].at + 1]];
+
+  var flow = (function () {
+    var svg = flowSvg, F = { x: 130, y: 322 };
+    var NODES = {
+      "grok-bot": { x: 510, y: 132, spec: SPECS.arch, role: "design", path: "M205 324 C 300 324 300 134 440 134" },
+      "codex": { x: 510, y: 310, spec: SPECS.dash, role: "review", path: "M205 324 Q 320 376 440 312" },
+      "grok": { x: 510, y: 480, spec: SPECS.box, role: "deploy", path: "M205 324 C 300 324 300 482 440 482" },
+      "you": { path: "M130 120 L130 214" }
+    };
+    var wires = {};
+    Object.keys(NODES).forEach(function (k) {
+      var n = NODES[k];
+      var base = el("path", { d: n.path, fill: "none", "stroke-linecap": "round", style: "stroke:var(--bird-line);stroke-width:5" + (k === "you" ? ";stroke-dasharray:1 11" : "") }, svg);
+      var lit = el("path", { d: n.path, fill: "none", "stroke-linecap": "round", style: "stroke:var(--tomato);stroke-width:5" }, svg);
+      var len = base.getTotalLength();
+      lit.setAttribute("stroke-dasharray", len + " " + len);
+      wires[k] = { base: base, lit: lit, len: len };
+    });
+    // Perches, names.
+    el("rect", { x: F.x - 75, y: F.y, width: 150, height: 5, rx: 2.500, style: fill("bird-line") }, svg);
+    el("text", { x: F.x, y: F.y + 36, "text-anchor": "middle", "font-size": 24, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, svg, "claude");
+    el("text", { x: F.x, y: F.y + 62, "text-anchor": "middle", "font-size": 19, style: "font-family:var(--font-mono);" + fill("ink-muted") }, svg, "coordinator");
+    var birds = {};
+    ["grok-bot", "codex", "grok"].forEach(function (k) {
+      var n = NODES[k];
+      el("rect", { x: n.x - 70, y: n.y, width: 140, height: 5, rx: 2.500, style: fill("bird-line") }, svg);
+      el("text", { x: n.x, y: n.y + 32, "text-anchor": "middle", "font-size": 21, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, svg, k + " · " + n.role);
+      birds[k] = makeBird(svg, n.spec, -1);
+    });
+    var coord = makeBird(svg, SPECS.dot, 1);
+    var you = makeBird(svg, SPECS.dot, 1, "action");
+    el("text", { x: 182, y: 92, "font-size": 24, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, svg, "you");
+    you.update({ x: 130, y: 116, p: 0, s: 0.85 });
+
+    // Result badges under each colleague.
+    function tag(x, y, text, color, on) {
+      var w = text.length * 12 + 26, g = el("g", {}, svg);
+      el("rect", { x: x - w / 2, y: y, width: w, height: 30, rx: 4, style: fill(color) }, g);
+      el("text", { x: x, y: y + 21, "text-anchor": "middle", "font-size": 20, "font-weight": 500, style: "font-family:var(--font-mono);" + fill(on) }, g, text);
+      return g;
+    }
+    var swatches = el("g", {}, svg);
+    [["brand-ink", 0], ["brand-teal-bright", 1], ["brand-butter", 2]].forEach(function (s) {
+      el("rect", { x: 510 - 54 + s[1] * 38, y: 132 + 46, width: 32, height: 28, rx: 3, style: fill(s[0]) + ";stroke:var(--bird-line);stroke-width:" + (s[1] === 1 ? 3 : 1.500) }, swatches);
+    });
+    var bug = tag(510, 310 + 46, "1 bug", "tomato", "brand-ink");
+    var ok = tag(510, 310 + 46, "approved", "brand-teal-bright", "brand-ink");
+    var live = tag(510, 480 + 46, "live", "brand-teal-bright", "brand-ink");
+    var buildBubble = makeBubble(svg, "building...", 21), fixBubble = makeBubble(svg, "fixing...", 21);
+
+    var zs = {};
+    Object.keys(birds).forEach(function (k) {
+      zs[k] = [0, 1].map(function () { return el("text", { "font-size": 24, "font-weight": 800, style: "font-family:var(--font-display);" + fill("ink") }, svg, "z"); });
+    });
+
+    var letters = STEPS.map(function (st) { return makeLetter(svg, st.from === "claude" || st.from === "you" ? "request" : "reply"); });
+
+    // A colleague is awake from when a request lands until just after it answers.
+    var windows = { "grok-bot": [], "codex": [], "grok": [] };
+    STEPS.forEach(function (st, i) {
+      if (windows[st.to] && STEPS[i + 1]) windows[st.to].push([st.at + 1, STEPS[i + 1].at + 1.2]);
+    });
+
+    function pop(n, t, from, to) {
+      var on = t >= from && t < to;
+      show(n, on);
+      if (!on) return;
+      var s = back(seg(t, from, from + 0.3));
+      var box = n.getBBox(), cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+      n.setAttribute("transform", "translate(" + cx + " " + cy + ") scale(" + s + ") translate(" + (-cx) + " " + (-cy) + ")");
+    }
+
+    return function render(t) {
+      var finished = t >= STEPS.end;
+      // Coordinator.
+      var hopsC = [], pushesC = [];
+      STEPS.forEach(function (st) { if (st.to === "claude") hopsC.push(st.at + 1); if (st.from === "claude") pushesC.push(st.at); });
+      var lean = 0;
+      pushesC.forEach(function (at) { lean += bump(t, at - 0.12, 0.5) * 12; });
+      var busyBuild = t >= STEPS[2].at + 1.1 && t < STEPS[3].at - 0.1;
+      var busyFix = t >= STEPS[4].at + 1.1 && t < STEPS[5].at - 0.1;
+      var bob = (busyBuild || busyFix) ? Math.abs(Math.sin(t * 9)) * 5 : 0;
+      coord.update({ x: F.x, y: F.y - hops(t, hopsC, 0.42, 30) - bob - hops(t, [STEPS.end], 0.5, 34), p: 1, s: 1.55, lean: lean });
+      buildBubble.update(255, 196, busyBuild ? back(seg(t, STEPS[2].at + 1.1, STEPS[2].at + 1.4)) : 0, 180);
+      fixBubble.update(245, 196, busyFix ? back(seg(t, STEPS[4].at + 1.1, STEPS[4].at + 1.4)) : 0, 180);
+
+      Object.keys(birds).forEach(function (k) {
+        var n = NODES[k], awake = finished;
+        windows[k].forEach(function (w) { if (t >= w[0] && t < w[1]) awake = true; });
+        var h = [];
+        STEPS.forEach(function (st) { if (st.to === k) h.push(st.at + 1); });
+        h.push(STEPS.end);
+        var l = 0;
+        STEPS.forEach(function (st) { if (st.from === k) l += bump(t, st.at - 0.12, 0.5) * -12; });
+        birds[k].update({ x: n.x, y: n.y - hops(t, h, 0.42, 26), p: 1, s: 1.15, lean: l, asleep: !awake });
+        zs[k].forEach(function (z, i) {
+          show(z, !awake);
+          if (awake) return;
+          var q = (t * 0.5 + i / 2) % 1;
+          z.setAttribute("x", n.x + 40 + q * 14 + i * 3);
+          z.setAttribute("y", n.y - 58 - q * 30);
+          z.setAttribute("opacity", Math.sin(Math.PI * q));
+        });
+      });
+
+      Object.keys(wires).forEach(function (k) { show(wires[k].lit, false); });
+      STEPS.forEach(function (st, i) {
+        var q = (t - st.at) / 1, on = q > 0 && q < 1;
+        show(letters[i], on);
+        if (!on) return;
+        var outward = st.from === "claude";
+        var key = st.from === "you" || st.to === "you" ? "you" : (outward ? st.to : st.from);
+        var w = wires[key], e = inOut(q);
+        var forward = key === "you" ? st.from === "you" : outward;
+        var at = (forward ? e : 1 - e) * w.len;
+        var pt = w.base.getPointAtLength(at);
+        letters[i].setAttribute("transform", "translate(" + pt.x + " " + (pt.y - 18) + ") scale(1.150)");
+        show(w.lit, true);
+        if (forward) { w.lit.setAttribute("stroke-dashoffset", w.len - at); }
+        else { w.lit.setAttribute("stroke-dashoffset", -at); }
+      });
+
+      pop(swatches, t, STEPS[2].at + 0.2, Infinity);
+      pop(bug, t, STEPS[4].at + 0.2, STEPS[6].at + 0.2);
+      pop(ok, t, STEPS[6].at + 0.2, Infinity);
+      pop(live, t, STEPS[8].at + 0.2, Infinity);
+
+      // The message list and progress strip.
+      var cur = -1;
+      STEPS.forEach(function (st, i) { if (t >= st.at) cur = i; });
+      STEPS.forEach(function (st, i) {
+        var s = finished ? "past" : i > cur ? "future" : i === cur ? "now" : "past";
+        if (st.li.getAttribute("data-s") !== s) st.li.setAttribute("data-s", s);
+      });
+      miles.forEach(function (m, i) {
+        var w = MILE_T[i], s = t >= w[1] ? "done" : t >= w[0] ? "active" : "todo";
+        if (m.getAttribute("data-s") !== s) m.setAttribute("data-s", s);
+      });
+      var show1 = STEPS[Math.max(cur, 0)];
+      var nowHtml = show1.from + " → " + show1.to + "|" + show1.text;
+      if (flowNow.getAttribute("data-k") !== nowHtml) {
+        flowNow.setAttribute("data-k", nowHtml);
+        flowNow.innerHTML = "";
+        var b = document.createElement("b"); b.textContent = show1.from + " → " + show1.to;
+        flowNow.appendChild(b); flowNow.appendChild(document.createTextNode(show1.text));
+      }
+    };
+  })();
+
+  /* ---------- playback ---------- */
+  function Player(o) {
+    var self = this, time = o.start, playing = o.autoplay, visible = false, raf = 0, last = 0, entered = false;
+    function label() { o.button.textContent = playing ? "Pause" : "Play"; }
+    function frame(now) {
+      raf = 0;
+      if (!playing || !visible) return;
+      var dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
+      last = now;
+      time = (time + dt) % o.T;
+      o.render(time);
+      raf = requestAnimationFrame(frame);
+    }
+    function kick() { if (playing && visible && !raf) { last = 0; raf = requestAnimationFrame(frame); } }
+    o.button.addEventListener("click", function () {
+      playing = !playing;
+      if (playing && o.restartFromRest && !entered) { entered = true; time = 0; }
+      label(); kick();
+    });
+    new IntersectionObserver(function (es) {
+      visible = es[es.length - 1].isIntersecting;
+      if (visible && playing && o.restartFromRest && !entered) { entered = true; time = 0; }
+      kick();
+    }, { threshold: 0.2 }).observe(o.watch);
+    self.setPlaying = function (v, still) { playing = v; if (!v && still != null) { time = still; o.render(still); } label(); kick(); };
+    self.redraw = function () { o.render(time); };
+    label();
+    o.render(time);
+  }
+
+  var narrowMq = window.matchMedia("(max-width: 640px)");
+  buildHero(narrowMq.matches);
+  var HERO_STILL = 4.55, isReduced = reduced.matches;
+  var heroPlayer = new Player({ render: renderHero, T: HERO_T, start: isReduced ? HERO_STILL : 0, autoplay: !isReduced, button: document.getElementById("hero-ctl"), watch: heroSvg });
+  var flowPlayer = new Player({ render: flow, T: FLOW_T, start: FLOW_T - 0.01, autoplay: !isReduced, restartFromRest: true, button: document.getElementById("flow-ctl"), watch: flowSvg });
+  narrowMq.addEventListener("change", function () { buildHero(narrowMq.matches); heroPlayer.redraw(); });
+  reduced.addEventListener("change", function () {
+    heroPlayer.setPlaying(!reduced.matches, HERO_STILL);
+    flowPlayer.setPlaying(!reduced.matches, FLOW_T - 0.01);
+  });
+
+  /* ---------- copy buttons ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (btn) {
+    btn.addEventListener("click", function () {
+      var code = btn.parentNode.querySelector("code");
+      function done(msg) { btn.textContent = msg; setTimeout(function () { btn.textContent = "Copy"; }, 1600); }
+      function selectIt() {
+        var r = document.createRange(); r.selectNodeContents(code);
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        done("Selected");
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code.textContent).then(function () { done("Copied"); }, selectIt);
+      } else { selectIt(); }
+    });
+  });
+})();
+</script>
+</body>
+</html>
