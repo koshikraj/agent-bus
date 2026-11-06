@@ -27,7 +27,7 @@ asked.
 On Linux or macOS:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh
+curl -fsSL https://getbirdie.xyz/install.sh | sh
 ```
 
 This downloads the latest release to `~/.local/bin`, checks its checksum, and

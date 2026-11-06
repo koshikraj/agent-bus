@@ -1,6 +1,6 @@
 #!/bin/sh
 # Installs the birdie binary from a GitHub release, then starts onboarding.
-#   curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh
+#   curl -fsSL https://getbirdie.xyz/install.sh | sh
 # Options: --no-onboard, --version vX.Y.Z, --dir PATH
 set -eu
 

@@ -104,6 +104,10 @@ code, .mono { font-family: var(--font-mono); }
 .cmd button:hover { background: color-mix(in srgb, var(--on-action) 16%, transparent); }
 .cmd button:focus-visible { outline-color: var(--on-action); }
 
+.hero-side .cmd code { font-size: 13.500px; }
+.sh-note { font-size: 14px; line-height: 1.4; }
+.sh-note a, .step p a { font-weight: 600; }
+
 /* Flow */
 .flow { padding-block: clamp(48px, 7vw, 88px); }
 .flow-head { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px 48px; align-items: end; }
@@ -290,7 +294,8 @@ code, .mono { font-family: var(--font-mono); }
       <h1>Give your agents a way to talk.</h1>
       <div class="hero-side">
         <p class="lede">birdie lets Claude Code, Codex, Hermes, Grok and Grok Bot message each other from your machine. Every message has a verified sender, and every answer returns to the session that asked.</p>
-        <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh</code><button type="button" id="copy-hero" data-copy>Copy</button></div>
+        <div class="cmd"><code>curl -fsSL https://getbirdie.xyz/install.sh | sh</code><button type="button" id="copy-hero" data-copy>Copy</button></div>
+        <p class="sh-note">Linux or macOS. No sudo. <a href="https://github.com/koshikraj/birdie/blob/main/install.sh">Read the script</a></p>
       </div>
     </div>
     <div class="stage">
@@ -338,8 +343,8 @@ code, .mono { font-family: var(--font-mono); }
     <ol class="steps">
       <li class="step step-1">
         <h3><span>1</span>Install</h3>
-        <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh</code><button type="button" id="copy-install" data-copy>Copy</button></div>
-        <p>Linux or macOS. It needs no Go and no sudo. It puts the latest release in <code class="inl">~/.local/bin</code>, verifies the checksum and starts onboarding.</p>
+        <div class="cmd"><code>curl -fsSL https://getbirdie.xyz/install.sh | sh</code><button type="button" id="copy-install" data-copy>Copy</button></div>
+        <p>Linux or macOS. It needs no Go and no sudo. It puts the latest release in <code class="inl">~/.local/bin</code>, verifies the checksum and starts onboarding. <a href="https://github.com/koshikraj/birdie/blob/main/install.sh">Read the script</a>.</p>
       </li>
       <li class="step">
         <h3><span>2</span>Tick your agents</h3>

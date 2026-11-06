@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Page not found | birdie</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=DM+Sans:opsz,wght@9..40,400&family=DM+Mono:wght@500&display=swap">
+<style>
+:root { --stage: #FFE9A8; --ink: #0A2E2B; --ink-muted: #2F5C58; --line: #0A2E2B; --focus: #0B6E69; }
+@media (prefers-color-scheme: dark) { :root { --stage: #164541; --ink: #EAF7F1; --ink-muted: #A8CFC7; --line: #EAF7F1; --focus: #4FD1C5; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; background: var(--stage); color: var(--ink); font: 400 18px/1.45 "DM Sans", system-ui, sans-serif; overflow-x: clip; }
+main { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; width: min(560px, 100%); padding: 32px max(20px, env(safe-area-inset-right, 0px)) 32px max(20px, env(safe-area-inset-left, 0px)); }
+svg { width: 150px; height: auto; display: block; }
+h1 { margin: 0; font: 800 clamp(40px, 9vw, 64px)/1 "Bricolage Grotesque", system-ui, sans-serif; letter-spacing: -0.04em; text-wrap: balance; }
+p { margin: 0; color: var(--ink-muted); }
+a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; font: 500 15px/1.2 "DM Mono", ui-monospace, monospace; }
+a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <svg viewBox="0 0 140 140" role="img" aria-label="Dot, the round red bird, asleep on a wire">
+    <rect x="5" y="124" width="130" height="6" rx="3" style="fill:var(--line)"/>
+    <path fill="#FF5533" d="M42 76 L20 68 L40 104 Z"/>
+    <circle cx="70" cy="92" r="32" fill="#FF5533"/>
+    <path style="fill:var(--line)" d="M100 82 L116 90 L100 98 Z"/>
+    <rect x="74" y="78" width="16" height="4" rx="2" fill="#FFFFFF"/>
+    <ellipse cx="58" cy="98" rx="14" ry="10" fill="#D93A1C" transform="rotate(-20 58 98)"/>
+    <text x="104" y="52" font-size="24" font-weight="800" style="fill:var(--ink);font-family:'Bricolage Grotesque',system-ui,sans-serif">z</text>
+  </svg>
+  <h1>Nothing on this wire.</h1>
+  <p>This page doesn't exist, or it has moved.</p>
+  <a href="/">Back to birdie</a>
+</main>
+</body>
+</html>
