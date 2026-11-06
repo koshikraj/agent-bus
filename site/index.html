@@ -28,6 +28,7 @@
   --font-text: "DM Sans", system-ui, sans-serif;
   --font-mono: "DM Mono", ui-monospace, Menlo, Consolas, monospace;
   --gutter: clamp(16px, 4vw, 40px);
+  --term-bg: #051B19; --term-bar: #0E2C29; --term-line: #24504A; --term-ink: #DDF3EB; --term-dim: #86ADA6; --term-out: #FFB199; --term-in: #4FD1C5;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -71,6 +72,7 @@ h2 { font-size: clamp(36px, 5vw, 64px); }
 .wrap { max-width: 1240px; margin-inline: auto; padding-left: max(var(--gutter), env(safe-area-inset-left, 0px)); padding-right: max(var(--gutter), env(safe-area-inset-right, 0px)); }
 .lede { font-size: clamp(17px, 1.6vw, 20px); line-height: 1.45; max-width: 58ch; }
 code, .mono { font-family: var(--font-mono); }
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 
 /* Header */
 .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; padding-block: 16px; }
@@ -104,29 +106,53 @@ code, .mono { font-family: var(--font-mono); }
 .flow { padding-block: clamp(48px, 7vw, 88px); }
 .flow-head { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px 48px; align-items: end; }
 .flow-head p { color: var(--ink-muted); }
-.miles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-block: 32px 24px; }
-.miles li { display: flex; align-items: center; gap: 8px; min-width: 0; padding-top: 10px; border-top: 6px solid var(--divider); font: 500 14px/1.2 var(--font-mono); color: var(--ink-muted); transition: color .2s, border-color .2s; }
-.miles li::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--divider); transition: background .2s; }
-.miles li[data-s="active"] { color: var(--ink); border-top-color: var(--tomato); }
-.miles li[data-s="active"]::before { background: var(--tomato); }
-.miles li[data-s="done"] { color: var(--ink); border-top-color: var(--brand-teal-bright); }
-.miles li[data-s="done"]::before { background: var(--brand-teal-bright); }
-.flow-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px 48px; align-items: start; }
+.miles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-block: 36px 28px; }
+.miles li { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.miles li:not(:last-child)::after { content: ""; position: absolute; top: 24px; left: 56px; right: 8px; height: 4px; border-radius: 2px; background: var(--divider); transition: background .3s; }
+.miles li[data-s="done"]:not(:last-child)::after { background: var(--brand-teal-bright); }
+.pi { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: var(--surface); color: var(--ink-muted); box-shadow: inset 0 0 0 2px var(--divider); transition: background .3s, color .3s, box-shadow .3s; }
+.pi svg { width: 26px; height: 26px; display: block; }
+.miles li[data-s="active"] .pi { background: var(--tomato); color: var(--brand-ink); box-shadow: 0 0 0 5px color-mix(in srgb, var(--tomato) 30%, transparent); }
+.miles li[data-s="done"] .pi { background: var(--brand-teal-bright); color: var(--brand-ink); box-shadow: none; }
+.pn { display: flex; flex-direction: column; gap: 1px; font: 700 clamp(16px, 1.6vw, 20px)/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-muted); transition: color .3s; }
+.pn small { font: 400 13px/1.3 var(--font-mono); letter-spacing: 0; color: var(--ink-muted); }
+.miles li[data-s="active"] .pn, .miles li[data-s="done"] .pn { color: var(--ink); }
+.flow-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 24px 40px; align-items: start; }
 .flow-stage { min-width: 0; }
 .flow-stage svg { display: block; width: 100%; height: auto; }
-.flow-now { display: none; min-height: 72px; font-size: 16px; line-height: 1.35; }
-.flow-now b { display: block; font: 500 13px/1.3 var(--font-mono); color: var(--ink-muted); }
-.log { display: flex; flex-direction: column; min-width: 0; }
-.log li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 12px; padding: 7px 10px; border-radius: 4px; transition: opacity .25s, background .25s; }
-.log .who { font: 500 13px/1.3 var(--font-mono); color: var(--ink-muted); min-width: 0; }
-.log .tid { font: 400 12px/1.3 var(--font-mono); color: var(--ink-muted); white-space: nowrap; }
-.log .tid svg { width: 11px; height: 11px; vertical-align: -1px; margin-right: 4px; fill: var(--brand-teal-bright); }
-.log .txt { grid-column: 1 / -1; font-size: 16px; line-height: 1.3; }
-.log li[data-s="future"] { opacity: 0.38; }
-.log li[data-s="now"] { background: var(--surface); }
-.note { margin-top: 14px; padding-inline: 10px; font-size: 14px; line-height: 1.4; color: var(--ink-muted); }
-.note code { white-space: nowrap; color: var(--ink); }
+.flow-now { display: none; min-height: 68px; font: 400 14px/1.4 var(--font-mono); }
+.flow-now b { display: block; font-weight: 500; color: var(--ink-muted); }
 .flow-foot { display: flex; justify-content: flex-end; }
+.flow-side { min-width: 0; }
+.term { border-radius: 10px; overflow: hidden; background: var(--term-bg); box-shadow: 0 0 0 1px var(--term-line), 0 18px 40px rgb(0 0 0 / 0.28); }
+.term-bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 10px 14px; background: var(--term-bar); color: var(--term-dim); font: 400 13px/1.2 var(--font-mono); }
+.term-dots { display: flex; gap: 7px; }
+.term-dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--term-line); }
+.term-bar b { font-weight: 500; color: var(--term-ink); white-space: nowrap; }
+.log { display: flex; flex-direction: column; gap: 5px; padding: 16px 16px 10px; font: 400 clamp(13px, 1.1vw, 14.500px)/1.45 var(--font-mono); color: var(--term-ink); }
+.log li { display: grid; grid-template-columns: 2ch 9ch minmax(0, 1fr); column-gap: 1ch; min-width: 0; }
+.log .m { color: var(--term-dim); }
+.log .n { white-space: nowrap; }
+.log .x { min-width: 0; overflow-wrap: anywhere; }
+.log .r { visibility: hidden; }
+.log .v { color: var(--term-in); margin-right: 1ch; }
+.log li[data-s="future"] { visibility: hidden; }
+.log li.out .m, .log li.out .n { color: var(--term-out); }
+.log li.in .m, .log li.in .n { color: var(--term-in); }
+.log li.work, .log li.work .m { color: var(--term-dim); }
+.log li.you .m, .log li.done .m { color: var(--tomato); }
+.log li.you .x, .log li.prompt .x { grid-column: 2 / -1; font-weight: 500; }
+.log li.done .x { grid-column: 2 / -1; color: var(--term-in); font-weight: 500; }
+.log li.work .x { grid-column: 2 / -1; font-style: normal; }
+.log li.prompt .m { color: var(--tomato); }
+.log .c { display: none; width: 0.62em; height: 1.1em; margin-right: -0.62em; vertical-align: -0.18em; background: var(--term-ink); }
+.log li[data-s="now"] .c { display: inline-block; }
+.log li.prompt[data-s="now"] .c { animation: blink 1.06s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.term-key { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 10px 16px 14px; border-top: 1px solid var(--term-line); color: var(--term-dim); font: 400 12px/1.4 var(--font-mono); }
+.term-key b { font-weight: 500; }
+.note { margin-top: 14px; font-size: 14px; line-height: 1.45; color: var(--ink-muted); }
+.note code { white-space: nowrap; color: var(--ink); }
 
 /* Install */
 .install { padding-block: clamp(40px, 5vw, 64px); }
@@ -169,16 +195,21 @@ code, .mono { font-family: var(--font-mono); }
 }
 @media (max-width: 640px) {
   .steps { grid-template-columns: minmax(0, 1fr); }
-  .miles li { flex-direction: column; align-items: flex-start; gap: 4px; font-size: 13px; }
+  .pi { width: 44px; height: 44px; border-radius: 12px; }
+  .pi svg { width: 22px; height: 22px; }
+  .miles li:not(:last-child)::after { top: 20px; left: 48px; right: 4px; }
+  .pn small { font-size: 12px; }
   .links a { padding-inline: 8px; }
   .cmd { flex-wrap: wrap; }
   .cmd code { flex-basis: 100%; }
   .cmd button { flex: 1; }
 }
-@media (prefers-reduced-motion: reduce) { .log li, .miles li, .miles li::before { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pi, .pn, .miles li::after { transition: none; } .log li.prompt[data-s="now"] .c { animation: none; } }
 </style>
 </head>
 <body>
+<svg class="sprite" aria-hidden="true" focusable="false"><symbol id="i-claudecode" viewBox="0 0 24 24" fill="currentColor"><g fill-rule="evenodd"><path clip-rule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></g></symbol><symbol id="i-codex" viewBox="0 0 24 24" fill="currentColor"><path d="M9.064 3.344a4.578 4.578 0 012.285-.312c1 .115 1.891.54 2.673 1.275.01.01.024.017.037.021a.09.09 0 00.043 0 4.55 4.55 0 013.046.275l.047.022.116.057a4.581 4.581 0 012.188 2.399c.209.51.313 1.041.315 1.595a4.24 4.24 0 01-.134 1.223.123.123 0 00.03.115c.594.607.988 1.33 1.183 2.17.289 1.425-.007 2.71-.887 3.854l-.136.166a4.548 4.548 0 01-2.201 1.388.123.123 0 00-.081.076c-.191.551-.383 1.023-.74 1.494-.9 1.187-2.222 1.846-3.711 1.838-1.187-.006-2.239-.44-3.157-1.302a.107.107 0 00-.105-.024c-.388.125-.78.143-1.204.138a4.441 4.441 0 01-1.945-.466 4.544 4.544 0 01-1.61-1.335c-.152-.202-.303-.392-.414-.617a5.81 5.81 0 01-.37-.961 4.582 4.582 0 01-.014-2.298.124.124 0 00.006-.056.085.085 0 00-.027-.048 4.467 4.467 0 01-1.034-1.651 3.896 3.896 0 01-.251-1.192 5.189 5.189 0 01.141-1.6c.337-1.112.982-1.985 1.933-2.618.212-.141.413-.251.601-.33.215-.089.43-.164.646-.227a.098.098 0 00.065-.066 4.51 4.51 0 01.829-1.615 4.535 4.535 0 011.837-1.388zm3.482 10.565a.637.637 0 000 1.272h3.636a.637.637 0 100-1.272h-3.636zM8.462 9.23a.637.637 0 00-1.106.631l1.272 2.224-1.266 2.136a.636.636 0 101.095.649l1.454-2.455a.636.636 0 00.005-.64L8.462 9.23z" fill="url(#lobe-icons-codex-_R_0_)"></path><defs><linearGradient gradientUnits="userSpaceOnUse" id="lobe-icons-codex-_R_0_" x1="12" x2="12" y1="3" y2="21"><stop stop-color="#B1A7FF"></stop><stop offset=".5" stop-color="#7A9DFF"></stop><stop offset="1" stop-color="#3941FF"></stop></linearGradient></defs></symbol><symbol id="i-codex-mono" viewBox="0 0 24 24" fill="currentColor"><g fill-rule="evenodd"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></g></symbol><symbol id="i-grok" viewBox="0 0 24 24" fill="currentColor"><g fill-rule="evenodd"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></g></symbol><symbol id="i-hermes" viewBox="0 0 180 180"><image href="data:image/png;base64,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" width="180" height="180"/></symbol><symbol id="i-figma" viewBox="0 0 24 24" fill="currentColor"><path d="M15.852 8.981h-4.588V0h4.588c2.476 0 4.49 2.014 4.49 4.49s-2.014 4.491-4.49 4.491zM12.735 7.51h3.117c1.665 0 3.019-1.355 3.019-3.019s-1.355-3.019-3.019-3.019h-3.117V7.51zm0 1.471H8.148c-2.476 0-4.49-2.014-4.49-4.49S5.672 0 8.148 0h4.588v8.981zm-4.587-7.51c-1.665 0-3.019 1.355-3.019 3.019s1.354 3.02 3.019 3.02h3.117V1.471H8.148zm4.587 15.019H8.148c-2.476 0-4.49-2.014-4.49-4.49s2.014-4.49 4.49-4.49h4.588v8.98zM8.148 8.981c-1.665 0-3.019 1.355-3.019 3.019s1.355 3.019 3.019 3.019h3.117V8.981H8.148zM8.172 24c-2.489 0-4.515-2.014-4.515-4.49s2.014-4.49 4.49-4.49h4.588v4.441c0 2.503-2.047 4.539-4.563 4.539zm-.024-7.51a3.023 3.023 0 0 0-3.019 3.019c0 1.665 1.365 3.019 3.044 3.019 1.705 0 3.093-1.376 3.093-3.068v-2.97H8.148zm7.704 0h-.098c-2.476 0-4.49-2.014-4.49-4.49s2.014-4.49 4.49-4.49h.098c2.476 0 4.49 2.014 4.49 4.49s-2.014 4.49-4.49 4.49zm-.097-7.509c-1.665 0-3.019 1.355-3.019 3.019s1.355 3.019 3.019 3.019h.098c1.665 0 3.019-1.355 3.019-3.019s-1.355-3.019-3.019-3.019h-.098z"/></symbol><symbol id="i-github" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></symbol><symbol id="i-vercel" viewBox="0 0 24 24" fill="currentColor"><path d="m12 1.608 12 20.784H0Z"/></symbol></svg>
+
 <header class="hero" id="top">
   <div class="wrap">
     <nav class="top" aria-label="Main">
@@ -196,14 +227,14 @@ code, .mono { font-family: var(--font-mono); }
     <div class="hero-copy">
       <h1>Give your agents a way to talk.</h1>
       <div class="hero-side">
-        <p class="lede">birdie lets Claude Code, Codex, Grok, Hermes and Grok Bot message each other from your machine. Every message has a verified sender, and every answer returns to the session that asked.</p>
+        <p class="lede">birdie lets Claude Code, Codex, Hermes, Grok and Grok Bot message each other from your machine. Every message has a verified sender, and every answer returns to the session that asked.</p>
         <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh</code><button type="button" id="copy-hero" data-copy>Copy</button></div>
       </div>
     </div>
     <div class="stage">
-      <svg id="hero-svg" role="img" aria-label="Five app icons named claude code, codex, grok, hermes and grok bot land on a wire and turn into birds. They pass letters along the wire and answer each other, then turn back into icons."></svg>
+      <svg id="hero-svg" role="img" aria-label="The app icons of Claude Code, Codex, Hermes and Grok Bot land on a wire and turn into birds. They pass letters along the wire and answer each other, then turn back into icons."></svg>
       <div class="stage-foot">
-        <p class="caption" id="hero-caption">Five agents, five separate windows.</p>
+        <p class="caption" id="hero-caption">Four agents, four separate windows.</p>
         <button type="button" class="ctl" id="hero-ctl">Pause</button>
       </div>
     </div>
@@ -217,11 +248,11 @@ code, .mono { font-family: var(--font-mono); }
         <h2 id="flow-title">One agent can run the whole feature.</h2>
         <p class="lede">Claude asks for a design, a review and a deploy, then carries on as each answer lands. A message wakes an idle session, so nobody has to go and fetch the reply.</p>
       </div>
-      <ol class="miles" aria-label="Feature progress">
-        <li data-m="0" data-s="done">Design</li>
-        <li data-m="1" data-s="done">Build</li>
-        <li data-m="2" data-s="done">Review</li>
-        <li data-m="3" data-s="done">Deploy</li>
+      <ol class="miles" aria-label="Feature pipeline">
+        <li data-m="0" data-s="done"><span class="pi"><svg aria-hidden="true"><use href="#i-figma"/></svg></span><span class="pn">Design<small>Figma</small></span></li>
+        <li data-m="1" data-s="done"><span class="pi"><svg aria-hidden="true"><use href="#i-github"/></svg></span><span class="pn">Code<small>GitHub</small></span></li>
+        <li data-m="2" data-s="done"><span class="pi"><svg aria-hidden="true"><use href="#i-codex-mono"/></svg></span><span class="pn">Review<small>Codex</small></span></li>
+        <li data-m="3" data-s="done"><span class="pi"><svg aria-hidden="true"><use href="#i-vercel"/></svg></span><span class="pn">Deploy<small>Vercel</small></span></li>
       </ol>
       <div class="flow-grid">
         <div class="flow-stage">
@@ -229,9 +260,13 @@ code, .mono { font-family: var(--font-mono); }
           <p class="flow-now" id="flow-now" aria-hidden="true"></p>
           <div class="flow-foot"><button type="button" class="ctl" id="flow-ctl">Play</button></div>
         </div>
-        <div>
-          <ol class="log" id="log" aria-label="Example messages"></ol>
-          <p class="note">An example. You choose which agent does what, and each one works with its own tools. birdie carries the messages and checks who sent them. Hermes only wakes on a message if you set it up with <code>birdie setup hermes --wake</code>. Otherwise messages wait for its next turn.</p>
+        <div class="flow-side">
+          <div class="term">
+            <div class="term-bar"><span class="term-dots" aria-hidden="true"><i></i><i></i><i></i></span><b>claude: ~/app</b><span></span></div>
+            <ol class="log" id="log" aria-label="Example session"></ol>
+            <div class="term-key" aria-hidden="true"><span><b style="color:var(--term-out)">&rarr;</b> sent</span><span><b style="color:var(--term-in)">&larr;</b> received</span><span><b style="color:var(--term-in)">&check;</b> verified sender</span></div>
+          </div>
+          <p class="note">An example session. You choose which agent does what, and each one works with its own tools. birdie carries the messages and checks who sent them. Hermes only wakes on a message if you set it up with <code>birdie setup hermes --wake</code>. Otherwise messages wait for its next turn.</p>
         </div>
       </div>
     </div>
@@ -302,60 +337,67 @@ code, .mono { font-family: var(--font-mono); }
   function lerp(a, b, p) { return a + (b - a) * p; }
   function inOut(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
   function outCubic(p) { return 1 - Math.pow(1 - p, 3); }
-  function back(p) { var c = 2.2; return p >= 1 ? 1 : 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); }
+  function back(p, k) { var c = k || 2.2; return p >= 1 ? 1 : 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); }
   function bump(t, at, dur) { var p = seg(t, at, at + dur); return p > 0 && p < 1 ? Math.sin(Math.PI * p) : 0; }
   function hops(t, list, dur, height) { var y = 0; for (var i = 0; i < list.length; i++) y += bump(t, list[i], dur) * height; return y; }
   function show(n, on) { n.style.display = on ? "" : "none"; }
 
   /* ---------- bird: one body rect that morphs between an app tile and a bird ---------- */
   var SPECS = {
-    dot:  { name: "dot",  c: 1, glyph: ">_", w: 64, h: 64, rx: 32, tail: "-28,-48 -50,-56 -30,-20", beak: "30,-42 46,-34 30,-26", eye: [12, -44], wing: [-12, -26, 14, 10, -20] },
-    dash: { name: "dash", c: 2, glyph: "{ }", w: 40, h: 84, rx: 20, tail: "-16,-36 -36,-10 -16,-6", beak: "19,-66 35,-58 19,-50", eye: [6, -62], wing: [-4, -30, 9, 16, 0] },
-    arch: { name: "arch", c: 3, glyph: "/?", w: 54, h: 70, rx: 27, tail: "-24,-44 -42,-56 -26,-16", beak: "25,-50 40,-42 25,-34", eye: [10, -48], wing: [-8, -26, 11, 14, 8] },
-    box:  { name: "box",  c: 4, glyph: "o o", w: 62, h: 58, rx: 18, tail: "-28,-36 -46,-48 -30,-12", beak: "29,-38 44,-30 29,-22", eye: [12, -36], wing: [-10, -20, 13, 10, -15] }
+    dot:  { c: 1, w: 64, h: 64, rx: 32, tail: "-28,-48 -50,-56 -30,-20", beak: "30,-42 46,-34 30,-26", eye: [12, -44], wing: [-12, -26, 14, 10, -20] },
+    dash: { c: 2, w: 40, h: 84, rx: 20, tail: "-16,-36 -36,-10 -16,-6", beak: "19,-66 35,-58 19,-50", eye: [6, -62], wing: [-4, -30, 9, 16, 0] },
+    arch: { c: 3, w: 54, h: 70, rx: 27, tail: "-24,-44 -42,-56 -26,-16", beak: "25,-50 40,-42 25,-34", eye: [10, -48], wing: [-8, -26, 11, 14, 8] },
+    box:  { c: 4, w: 62, h: 58, rx: 18, tail: "-28,-36 -46,-48 -30,-12", beak: "29,-38 44,-30 29,-22", eye: [12, -36], wing: [-10, -20, 13, 10, -15] }
   };
   var TILE = { w: 68, h: 68, rx: 17 };
+  var CAN_MIX = !!(window.CSS && CSS.supports && CSS.supports("color", "color-mix(in oklab, red 50%, blue)"));
   function pts(str) { return str.split(" ")[0].split(",").map(Number); }
 
-  function makeBird(parent, spec, face, tileColor, glyphText) {
-    var c = spec.c, g = el("g", {}, parent), turn = el("g", { transform: "scale(" + face + " 1)" }, g);
-    var bodyFill = tileColor || ("agent-" + c);
+  // tile: { bg, icon, iconColor, size } or { bg, text, textColor }. Its color blends into the bird's.
+  function makeBird(parent, spec, face, tile) {
+    var c = spec.c, birdFill = "var(--agent-" + c + ")", g = el("g", {}, parent), turn = el("g", { transform: "scale(" + face + " 1)" }, g);
     var tail = el("polygon", { points: spec.tail, style: fill("agent-" + c) }, turn);
-    var body = el("rect", { style: fill(bodyFill) }, turn);
+    var body = el("rect", { style: "fill:" + birdFill }, turn);
     var wing = el("ellipse", { rx: spec.wing[2], ry: spec.wing[3], style: fill("agent-" + c + "-wing") }, turn);
     var beak = el("polygon", { points: spec.beak, style: fill("bird-line") }, turn);
     var eyeW = el("circle", { r: 9, cx: spec.eye[0], cy: spec.eye[1], style: fill("bird-eye") }, turn);
     var eyeP = el("circle", { r: 4.5, cx: spec.eye[0] + 3, cy: spec.eye[1], style: fill("bird-pupil") }, turn);
     var eyeS = el("rect", { x: spec.eye[0] - 8, y: spec.eye[1] - 2, width: 16, height: 4, rx: 2, style: fill("bird-eye") }, turn);
-    var glyph = el("text", { x: 0, y: -25, "text-anchor": "middle", "font-size": 26, "font-weight": 500, style: "font-family:var(--font-mono);" + fill(tileColor ? "on-action" : "agent-" + c + "-on") }, g, glyphText || spec.glyph);
+    var glyph = null, lastFill = "";
+    if (tile && tile.icon) {
+      var z = tile.size || 46;
+      glyph = el("use", { href: "#" + tile.icon, x: -z / 2, y: -34 - z / 2, width: z, height: z, style: "color:" + (tile.iconColor || "#000") }, g);
+    } else if (tile && tile.text) {
+      glyph = el("text", { x: 0, y: -25, "text-anchor": "middle", "font-size": 26, "font-weight": 500, style: "font-family:var(--font-mono);fill:" + tile.textColor }, g, tile.text);
+    }
     var tp = pts(spec.tail), bp = pts(spec.beak);
     function part(n, ox, oy, s, extra) {
-      n.setAttribute("transform", "translate(" + ox + " " + oy + ") scale(" + s + ") translate(" + (-ox) + " " + (-oy) + ")" + (extra || ""));
       show(n, s > 0.01);
+      if (s > 0.01) n.setAttribute("transform", "translate(" + ox + " " + oy + ") scale(" + s + ") translate(" + (-ox) + " " + (-oy) + ")" + (extra || ""));
     }
     return {
       g: g,
       update: function (o) {
-        var p = o.p, s = o.s || 1;
+        var p = o.p, s = o.s || 1, mix = o.color == null ? clamp(p) : o.color;
         if (o.face != null) turn.setAttribute("transform", "scale(" + o.face + " 1)");
-        var w = lerp(TILE.w, spec.w, p), h = lerp(TILE.h, spec.h, p);
-        w = Math.max(10, w); h = Math.max(10, h);
+        var w = Math.max(10, lerp(TILE.w, spec.w, p)), h = Math.max(10, lerp(TILE.h, spec.h, p));
         var rx = Math.min(Math.max(lerp(TILE.rx, spec.rx, p), 4), w / 2, h / 2);
         body.setAttribute("x", -w / 2); body.setAttribute("y", -h); body.setAttribute("width", w); body.setAttribute("height", h); body.setAttribute("rx", rx);
-        var parts = clamp((p - 0.35) / 0.65);
+        if (tile) {
+          var f = mix >= 0.995 ? birdFill : mix <= 0.005 ? tile.bg : CAN_MIX ? "color-mix(in oklab, " + birdFill + " " + (mix * 100).toFixed(1) + "%, " + tile.bg + ")" : (mix < 0.5 ? tile.bg : birdFill);
+          if (f !== lastFill) { body.style.fill = f; lastFill = f; }
+        }
+        var parts = clamp((p - 0.45) / 0.55);
         part(tail, tp[0], tp[1], parts);
         part(beak, bp[0], bp[1] + 8, parts);
-        part(wing, spec.wing[0], spec.wing[1], parts);
+        part(wing, spec.wing[0], spec.wing[1], parts, spec.wing[4] ? " rotate(" + spec.wing[4] + " " + spec.wing[0] + " " + spec.wing[1] + ")" : "");
         wing.setAttribute("cx", spec.wing[0]); wing.setAttribute("cy", spec.wing[1]);
-        var wr = spec.wing[4] ? "rotate(" + spec.wing[4] + " " + spec.wing[0] + " " + spec.wing[1] + ")" : "";
-        if (parts > 0.01) wing.setAttribute("transform", "translate(" + spec.wing[0] + " " + spec.wing[1] + ") scale(" + parts + ") translate(" + (-spec.wing[0]) + " " + (-spec.wing[1]) + ") " + wr);
-        var eyes = clamp((p - 0.5) / 0.5);
+        var eyes = clamp((p - 0.6) / 0.4);
         var asleep = !!o.asleep && eyes > 0.5;
         part(eyeW, spec.eye[0], spec.eye[1], asleep ? 0 : eyes);
         part(eyeP, spec.eye[0] + 3, spec.eye[1], asleep ? 0 : eyes);
         show(eyeS, asleep);
-        var gl = clamp(1 - p / 0.3);
-        glyph.setAttribute("opacity", gl); show(glyph, gl > 0.01);
+        if (glyph) { var gl = 1 - seg(mix, 0.05, 0.5); glyph.setAttribute("opacity", gl); show(glyph, gl > 0.01); }
         g.setAttribute("transform", "translate(" + o.x + " " + o.y + ") rotate(" + (o.lean || 0) + ") scale(" + s + ")");
       }
     };
@@ -391,52 +433,46 @@ code, .mono { font-family: var(--font-mono); }
 
   /* ---------- hero: icons land on a wire, turn into birds, trade letters, turn back ---------- */
   var heroSvg = document.getElementById("hero-svg"), heroCaption = document.getElementById("hero-caption");
-  var HERO_T = 19;
+  var HERO_T = 17;
   var CAPTIONS = [
-    [0, "Five agents, five separate windows."],
+    [0, "Four agents, four separate windows."],
     [1.4, "birdie puts them on one wire."],
-    [3.3, "Any agent can message any other."],
-    [7.1, "A message wakes an idle session."],
-    [10.6, "Hermes joins in through its own plugin."],
-    [13.8, "Every answer returns to the session that asked."],
-    [17.2, "Install it once. They stay connected."]
+    [3.7, "Any agent can message any other."],
+    [7.5, "A message wakes an idle session."],
+    [11.2, "Every answer returns to the session that asked."],
+    [14.6, "Install it once. They stay connected."]
   ];
-  // The two Grok agents share a shape: past four agents, shapes repeat and the name tells them apart.
   var HERO_AGENTS = [
-    { label: "claude code", short: "claude", spec: SPECS.dot, face: 1, morph: 1.5, pushes: [4.0, 13.8], hops: [6.9, 15.0] },
-    { label: "codex", spec: SPECS.dash, face: 1, morph: 1.8, pushes: [7.7, 14.3], hops: [10.2, 15.5] },
-    { label: "grok", spec: SPECS.arch, glyph: "/?", face: -1, morph: 2.1, turn: [10.4, 13.6], pushes: [5.9, 12.8, 14.5], hops: [5.0, 11.9, 15.3] },
-    { label: "hermes", spec: SPECS.box, glyph: "=>", face: -1, morph: 2.4, pushes: [11.2, 14.15], hops: [13.5, 16.0] },
-    { label: "grok bot", spec: SPECS.arch, glyph: "o o", face: -1, morph: 2.7, pushes: [9.4, 14.0], hops: [8.5, 14.8] }
+    { label: "claude code", spec: SPECS.dot, face: 1, morph: 1.5, tile: { bg: "#D97757", icon: "i-claudecode", iconColor: "#FFF7F0", size: 50 }, pushes: [4.4, 11.2], hops: [7.3, 12.4] },
+    { label: "codex", spec: SPECS.dash, face: 1, morph: 1.8, tile: { bg: "#FFFFFF", icon: "i-codex", size: 52 }, pushes: [8.1, 11.7], hops: [10.6, 12.9] },
+    { label: "hermes", spec: SPECS.box, face: -1, morph: 2.1, tile: { bg: "#FFFFFF", icon: "i-hermes", size: 58 }, pushes: [6.3, 11.9], hops: [5.4, 12.7] },
+    { label: "grok bot", spec: SPECS.arch, face: -1, morph: 2.4, tile: { bg: "#000000", icon: "i-grok", iconColor: "#FFFFFF", size: 44 }, pushes: [9.8, 11.4], hops: [8.9, 12.2] }
   ];
   var HERO_LETTERS = [
-    { a: 0, b: 2, at: 4.0, dur: 1.0, tone: "request" }, { a: 2, b: 0, at: 5.9, dur: 1.0, tone: "reply" },
-    { a: 1, b: 4, at: 7.7, dur: 0.8, tone: "request" }, { a: 4, b: 1, at: 9.4, dur: 0.8, tone: "reply" },
-    { a: 3, b: 2, at: 11.2, dur: 0.7, tone: "request" }, { a: 2, b: 3, at: 12.8, dur: 0.7, tone: "reply" },
-    { a: 0, b: 4, at: 13.8, dur: 1.0, tone: "request" }, { a: 4, b: 0, at: 14.0, dur: 1.0, tone: "reply" },
-    { a: 3, b: 0, at: 14.15, dur: 1.0, tone: "request" }, { a: 1, b: 2, at: 14.3, dur: 1.0, tone: "request" },
-    { a: 2, b: 1, at: 14.5, dur: 1.0, tone: "reply" }
+    { a: 0, b: 2, at: 4.4, dur: 1.0, tone: "request" }, { a: 2, b: 0, at: 6.3, dur: 1.0, tone: "reply" },
+    { a: 1, b: 3, at: 8.1, dur: 0.8, tone: "request" }, { a: 3, b: 1, at: 9.8, dur: 0.8, tone: "reply" },
+    { a: 0, b: 3, at: 11.2, dur: 1.0, tone: "request" }, { a: 3, b: 0, at: 11.4, dur: 1.0, tone: "reply" },
+    { a: 1, b: 2, at: 11.7, dur: 1.0, tone: "request" }, { a: 2, b: 1, at: 11.9, dur: 1.0, tone: "reply" }
   ];
   var HERO_BUBBLES = [
-    { a: 0, text: "grok, check my math?", from: 3.3, to: 4.9 }, { a: 2, text: "off by one.", from: 5.2, to: 6.9 },
-    { a: 1, text: "any meetings today?", from: 7.1, to: 8.6 }, { a: 4, text: "free till 3.", from: 8.8, to: 10.4 },
-    { a: 3, text: "grok, got the logs?", from: 10.6, to: 12.1 }, { a: 2, text: "sending them.", from: 12.2, to: 13.6 }
+    { a: 0, text: "hermes, check my math?", from: 3.7, to: 5.3 }, { a: 2, text: "off by one.", from: 5.6, to: 7.3 },
+    { a: 1, text: "any meetings today?", from: 7.5, to: 9.0 }, { a: 3, text: "free till 3.", from: 9.2, to: 10.8 }
   ];
-  var WAKE = 8.5, UNMORPH = 17.1, SLEEPER = 4;
+  var WAKE = 8.9, UNMORPH = 14.4, SLEEPER = 3, MORPH_IN = 1.1, MORPH_OUT = 1.0;
   var heroScene = null;
 
   function buildHero(narrow) {
     while (heroSvg.firstChild) heroSvg.removeChild(heroSvg.firstChild);
     var L = narrow
-      ? { w: 800, h: 410, xs: [90, 245, 400, 555, 710], wire: 320, S: 1.3, fs: 26, lab: 26, labY: 366, letter: 1.35 }
-      : { w: 1160, h: 340, xs: [130, 355, 580, 805, 1030], wire: 262, S: 1.25, fs: 20, lab: 20, labY: 300, letter: 1.1 };
+      ? { w: 760, h: 410, xs: [100, 290, 480, 670], wire: 320, S: 1.3, fs: 26, lab: 26, labY: 366, letter: 1.35 }
+      : { w: 1160, h: 340, xs: [170, 440, 720, 990], wire: 262, S: 1.25, fs: 20, lab: 20, labY: 300, letter: 1.1 };
     heroSvg.setAttribute("viewBox", "0 0 " + L.w + " " + L.h);
     var wire = el("rect", { y: L.wire, height: 6, rx: 3, style: fill("bird-line") }, heroSvg);
     var agents = HERO_AGENTS.map(function (a, i) {
-      var label = el("text", { x: L.xs[i], y: L.labY, "text-anchor": "middle", "font-size": L.lab, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, heroSvg, narrow && a.short ? a.short : a.label);
+      var label = el("text", { x: L.xs[i], y: L.labY, "text-anchor": "middle", "font-size": L.lab, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, heroSvg, a.label);
       var bits = [];
       for (var k = 0; k < 7; k++) bits.push(el("circle", { r: 5, style: fill("agent-" + a.spec.c) }, heroSvg));
-      return { a: a, x: L.xs[i], bird: makeBird(heroSvg, a.spec, a.face, null, a.glyph), bits: bits, label: label };
+      return { a: a, x: L.xs[i], bird: makeBird(heroSvg, a.spec, a.face, a.tile), bits: bits, label: label };
     });
     var zs = [0, 1, 2].map(function () { return el("text", { "font-size": L.fs + 6, "font-weight": 800, style: "font-family:var(--font-display);" + fill("ink") }, heroSvg, "z"); });
     var bubbles = HERO_BUBBLES.map(function (b) { return { b: b, ui: makeBubble(heroSvg, b.text, L.fs) }; });
@@ -456,29 +492,31 @@ code, .mono { font-family: var(--font-mono); }
   function renderHero(t) {
     var sc = heroScene, L = sc.L;
     // The wire draws out from the middle and reaches past both page edges.
-    var draw = inOut(seg(t, 0.8, 1.4)) * (1 - inOut(seg(t, 18.2, 18.7)));
+    var draw = inOut(seg(t, 0.8, 1.4)) * (1 - inOut(seg(t, 16.1, 16.6)));
     var half = draw * 3200;
     sc.wire.setAttribute("x", L.w / 2 - half); sc.wire.setAttribute("width", half * 2);
     show(sc.wire, draw > 0.001);
 
     sc.agents.forEach(function (ag, i) {
       var a = ag.a;
-      var pIn = back(seg(t, a.morph, a.morph + 0.55));
-      var pOut = inOut(seg(t, UNMORPH + i * 0.14, UNMORPH + i * 0.14 + 0.5));
-      var p = t < UNMORPH ? pIn : 1 - pOut;
+      // Shape and color change together: the logo fades as the tile takes on the bird's color.
+      var outAt = UNMORPH + i * 0.2;
+      var qIn = seg(t, a.morph, a.morph + MORPH_IN);
+      var color = t < UNMORPH ? inOut(qIn) : 1 - inOut(seg(t, outAt, outAt + MORPH_OUT));
+      var p = t < UNMORPH ? color + Math.sin(Math.PI * seg(qIn, 0.55, 1)) * 0.07 : color; // a small settle at the end
       // Before the wire arrives, and after it goes, the tiles float on their own.
-      var land = inOut(seg(t, 1.2, 1.5)) * (1 - inOut(seg(t, 18.1, 18.5)));
+      var land = inOut(seg(t, 1.2, 1.5)) * (1 - inOut(seg(t, 16.0, 16.4)));
       var floaty = (1 - land) * (22 + Math.sin(t * 2 + i * 1.7) * 6);
-      var y = L.wire - floaty - hops(t, a.hops, 0.42, 30) - hops(t, [a.morph], 0.5, 26);
+      var y = L.wire - floaty - hops(t, a.hops, 0.42, 30) - hops(t, [a.morph + 0.1], 0.6, 22);
       var face = a.face;
       if (a.turn) face = a.face * (1 - 2 * (inOut(seg(t, a.turn[0], a.turn[0] + 0.3)) - inOut(seg(t, a.turn[1], a.turn[1] + 0.3))));
       var lean = 0;
       a.pushes.forEach(function (at) { lean += bump(t, at - 0.12, 0.5) * 16 * face; });
       var asleep = i === SLEEPER && t < WAKE;
-      ag.bird.update({ x: ag.x, y: y, p: p, s: L.S, lean: lean, asleep: asleep, face: face });
+      ag.bird.update({ x: ag.x, y: y, p: p, s: L.S, lean: lean, asleep: asleep, face: face, color: color });
       // Feather pop on each change.
       ag.bits.forEach(function (n) { show(n, false); });
-      [a.morph + 0.12, UNMORPH + i * 0.14 + 0.2].forEach(function (b) {
+      [a.morph + 0.45, outAt + 0.45].forEach(function (b) {
         var q = seg(t, b, b + 0.6);
         if (q > 0 && q < 1) ag.bits.forEach(function (n, k) {
           var ang = k / 7 * Math.PI * 2 + i, d = outCubic(q) * 74 * L.S;
@@ -532,30 +570,43 @@ code, .mono { font-family: var(--font-mono); }
   var flowSvg = document.getElementById("flow-svg"), logEl = document.getElementById("log"), flowNow = document.getElementById("flow-now");
   var STEPS = [
     { from: "you", to: "claude", text: "Add dark mode to settings and ship it.", after: 0.5 },
-    { from: "claude", to: "grok-bot", tid: "design", text: "We need a dark palette for settings. Any ideas?" },
-    { from: "grok-bot", to: "claude", tid: "design", text: "Here are three. I'd pick the middle one.", after: 2.2 },
-    { from: "claude", to: "codex", tid: "review", text: "The PR is up. Can you review it?" },
-    { from: "codex", to: "claude", tid: "review", text: "The toggle resets on reload. One fix needed.", after: 1.5 },
-    { from: "claude", to: "codex", tid: "review", text: "Fixed. Another look?" },
-    { from: "codex", to: "claude", tid: "review", text: "Looks good. Approved." },
-    { from: "claude", to: "hermes", tid: "deploy", text: "Approved. Please deploy to staging." },
-    { from: "hermes", to: "claude", tid: "deploy", text: "It's live on staging and the smoke tests pass." },
-    { from: "claude", to: "you", text: "Dark mode is on staging, reviewed and tested." }
+    { from: "claude", to: "grok-bot", text: "We need a dark palette for settings. Any ideas?" },
+    { from: "grok-bot", to: "claude", text: "Three options in Figma. I'd pick the middle one.", after: 2.2 },
+    { from: "claude", to: "codex", text: "The PR is up on GitHub. Can you review it?" },
+    { from: "codex", to: "claude", text: "The toggle resets on reload. One fix needed.", after: 1.5 },
+    { from: "claude", to: "codex", text: "Fixed. Another look?" },
+    { from: "codex", to: "claude", text: "Looks good. Approved." },
+    { from: "claude", to: "hermes", text: "Approved. Please deploy it to Vercel." },
+    { from: "hermes", to: "claude", text: "It's live on Vercel and the smoke tests pass." },
+    { from: "claude", to: "you", text: "Dark mode is live, reviewed and tested." }
   ];
   (function () { var s = 0.4; STEPS.forEach(function (st) { st.at = s; s += 1 + (st.after == null ? 0.65 : st.after); }); STEPS.end = STEPS[STEPS.length - 1].at + 1; })();
   var FLOW_HOLD = 4, FLOW_T = STEPS.end + FLOW_HOLD;
 
-  var CHECK = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg>';
-  STEPS.forEach(function (st) {
-    var li = document.createElement("li");
-    var who = document.createElement("span"); who.className = "who"; who.textContent = st.from + " → " + st.to; li.appendChild(who);
-    var tid = document.createElement("span"); tid.className = "tid";
-    if (st.tid) { tid.innerHTML = CHECK; tid.appendChild(document.createTextNode("thread: " + st.tid)); tid.setAttribute("title", "Verified sender"); }
-    li.appendChild(tid);
-    var txt = document.createElement("span"); txt.className = "txt"; txt.textContent = st.text; li.appendChild(txt);
-    li.setAttribute("data-s", "past");
-    logEl.appendChild(li); st.li = li;
+  // The terminal is claude's session: what you typed, what it sent, what came back, and its own work.
+  var LINES = [];
+  STEPS.forEach(function (st, i) {
+    var kind = st.from === "you" ? "you" : st.to === "you" ? "done" : st.from === "claude" ? "out" : "in";
+    LINES.push({ kind: kind, at: st.at + (kind === "out" || kind === "you" ? 0 : 0.85), who: kind === "out" ? st.to : st.from, text: st.text, step: st });
+    if (i === 2) LINES.push({ kind: "work", at: st.at + 1.3, text: "Writing the code and opening a PR on GitHub...", who: "claude" });
+    if (i === 4) LINES.push({ kind: "work", at: st.at + 1.3, text: "Fixing the toggle and pushing to the PR...", who: "claude" });
   });
+  LINES.push({ kind: "prompt", at: STEPS.end, text: "", who: "" });
+  var MARK = { you: "\u276f", out: "\u2192", "in": "\u2190", work: "\u00b7", done: "\u2713", prompt: "\u276f" };
+  LINES.forEach(function (ln) {
+    var li = document.createElement("li"); li.className = ln.kind;
+    var m = document.createElement("span"); m.className = "m"; m.textContent = MARK[ln.kind]; li.appendChild(m);
+    if (ln.kind === "out" || ln.kind === "in") { var n = document.createElement("span"); n.className = "n"; n.textContent = ln.who; li.appendChild(n); }
+    var x = document.createElement("span"); x.className = "x";
+    if (ln.kind === "in") { var v = document.createElement("span"); v.className = "v"; v.textContent = "\u2713"; v.title = "Verified sender"; x.appendChild(v); }
+    ln.t = document.createElement("span"); ln.t.className = "t"; ln.t.textContent = ln.text; x.appendChild(ln.t);
+    var c = document.createElement("i"); c.className = "c"; x.appendChild(c);
+    ln.r = document.createElement("span"); ln.r.className = "r"; x.appendChild(ln.r);
+    li.appendChild(x);
+    li.setAttribute("data-s", "past");
+    logEl.appendChild(li); ln.li = li; ln.shown = ln.text.length;
+  });
+  var TYPE_CPS = 60;
   var miles = Array.prototype.slice.call(document.querySelectorAll(".miles li"));
   var MILE_T = [[STEPS[1].at, STEPS[2].at + 1], [STEPS[2].at + 1, STEPS[3].at], [STEPS[3].at, STEPS[6].at + 1], [STEPS[7].at, STEPS[8].at + 1]];
 
@@ -588,15 +639,15 @@ code, .mono { font-family: var(--font-mono); }
       birds[k] = makeBird(svg, n.spec, -1);
     });
     var coord = makeBird(svg, SPECS.dot, 1);
-    var you = makeBird(svg, SPECS.dot, 1, "action");
+    var you = makeBird(svg, SPECS.dot, 1, { bg: "var(--action)", text: ">_", textColor: "var(--on-action)" });
     el("text", { x: 182, y: 92, "font-size": 24, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, svg, "you");
     you.update({ x: 130, y: 116, p: 0, s: 0.85 });
 
     // Result badges under each colleague.
     function tag(x, y, text, color, on) {
-      var w = text.length * 12 + 26, g = el("g", {}, svg);
+      var w = text.length * 12 + 26 + (text === "live" ? 28 : 0), g = el("g", {}, svg);
       el("rect", { x: x - w / 2, y: y, width: w, height: 30, rx: 4, style: fill(color) }, g);
-      el("text", { x: x, y: y + 21, "text-anchor": "middle", "font-size": 20, "font-weight": 500, style: "font-family:var(--font-mono);" + fill(on) }, g, text);
+      el("text", { x: x + (text === "live" ? 12 : 0), y: y + 21, "text-anchor": "middle", "font-size": 20, "font-weight": 500, style: "font-family:var(--font-mono);" + fill(on) }, g, text);
       return g;
     }
     var swatches = el("g", {}, svg);
@@ -606,6 +657,7 @@ code, .mono { font-family: var(--font-mono); }
     var bug = tag(510, 310 + 46, "1 bug", "tomato", "brand-ink");
     var ok = tag(510, 310 + 46, "approved", "brand-teal-bright", "brand-ink");
     var live = tag(510, 480 + 46, "live", "brand-teal-bright", "brand-ink");
+    el("use", { href: "#i-vercel", x: 510 - 46, y: 480 + 52, width: 18, height: 18, style: "color:var(--brand-ink)" }, live);
     var buildBubble = makeBubble(svg, "building...", 21), fixBubble = makeBubble(svg, "fixing...", 21);
 
     var zs = {};
@@ -685,24 +737,27 @@ code, .mono { font-family: var(--font-mono); }
       pop(ok, t, STEPS[6].at + 0.2, Infinity);
       pop(live, t, STEPS[8].at + 0.2, Infinity);
 
-      // The message list and progress strip.
+      // The terminal types the current line, and the pipeline follows along.
       var cur = -1;
-      STEPS.forEach(function (st, i) { if (t >= st.at) cur = i; });
-      STEPS.forEach(function (st, i) {
-        var s = finished ? "past" : i > cur ? "future" : i === cur ? "now" : "past";
-        if (st.li.getAttribute("data-s") !== s) st.li.setAttribute("data-s", s);
+      LINES.forEach(function (ln, i) { if (t >= ln.at) cur = i; });
+      LINES.forEach(function (ln, i) {
+        var s = i > cur ? "future" : i === cur ? "now" : "past";
+        if (ln.li.getAttribute("data-s") !== s) ln.li.setAttribute("data-s", s);
+        var n = s === "future" ? 0 : s === "past" ? ln.text.length : Math.min(ln.text.length, Math.floor((t - ln.at) * TYPE_CPS));
+        if (n !== ln.shown) { ln.shown = n; ln.t.textContent = ln.text.slice(0, n); ln.r.textContent = ln.text.slice(n); }
       });
       miles.forEach(function (m, i) {
         var w = MILE_T[i], s = t >= w[1] ? "done" : t >= w[0] ? "active" : "todo";
         if (m.getAttribute("data-s") !== s) m.setAttribute("data-s", s);
       });
-      var show1 = STEPS[Math.max(cur, 0)];
-      var nowHtml = show1.from + " → " + show1.to + "|" + show1.text;
-      if (flowNow.getAttribute("data-k") !== nowHtml) {
-        flowNow.setAttribute("data-k", nowHtml);
+      var st = STEPS[0];
+      STEPS.forEach(function (x) { if (t >= x.at) st = x; });
+      var key = st.from + " \u2192 " + st.to + "|" + st.text;
+      if (flowNow.getAttribute("data-k") !== key) {
+        flowNow.setAttribute("data-k", key);
         flowNow.innerHTML = "";
-        var b = document.createElement("b"); b.textContent = show1.from + " → " + show1.to;
-        flowNow.appendChild(b); flowNow.appendChild(document.createTextNode(show1.text));
+        var b = document.createElement("b"); b.textContent = st.from + " \u2192 " + st.to;
+        flowNow.appendChild(b); flowNow.appendChild(document.createTextNode(st.text));
       }
     };
   })();
@@ -739,7 +794,7 @@ code, .mono { font-family: var(--font-mono); }
 
   var narrowMq = window.matchMedia("(max-width: 640px)");
   buildHero(narrowMq.matches);
-  var HERO_STILL = 4.55, isReduced = reduced.matches;
+  var HERO_STILL = 4.9, isReduced = reduced.matches;
   var heroPlayer = new Player({ render: renderHero, T: HERO_T, start: isReduced ? HERO_STILL : 0, autoplay: !isReduced, button: document.getElementById("hero-ctl"), watch: heroSvg });
   var flowPlayer = new Player({ render: flow, T: FLOW_T, start: FLOW_T - 0.01, autoplay: !isReduced, restartFromRest: true, button: document.getElementById("flow-ctl"), watch: flowSvg });
   narrowMq.addEventListener("change", function () { buildHero(narrowMq.matches); heroPlayer.redraw(); });
