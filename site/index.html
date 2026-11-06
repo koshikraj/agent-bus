@@ -550,7 +550,7 @@ code, .mono { font-family: var(--font-mono); }
     return heroScene;
   }
 
-  /* ---------- logo: the two birds pop into a dot and a line, then back ---------- */
+  /* ---------- logo: the two birds pop into the small icon's dot and upright dash, then back ---------- */
   var LOGO_T = 8.5, LOGO_POP = 0.7; // Two logo loops fit one hero loop, and the reduced-motion still lands on the birds.
   var LOGO_OUT = [5.2, 5.32], LOGO_BACK = [7.6, 7.72];
   var renderLogo = (function () {
@@ -590,10 +590,14 @@ code, .mono { font-family: var(--font-mono); }
     return function (t) {
       var u = t % LOGO_T;
       var d = amount(u, LOGO_OUT[0], LOGO_BACK[0]), l = amount(u, LOGO_OUT[1], LOGO_BACK[1]);
-      var hop = Math.sin(Math.PI * clamp(d)) * 4;
-      dot.setAttribute("cx", lerp(38, 30, d)); dot.setAttribute("cy", lerp(62, 60, d) - hop); dot.setAttribute("r", Math.max(1, lerp(24, 18, d)));
-      var w = Math.max(4, lerp(30, 52, l)), h = Math.max(4, lerp(64, 24, l));
-      dash.setAttribute("x", lerp(74, 58, l)); dash.setAttribute("y", lerp(22, 48, l)); dash.setAttribute("width", w); dash.setAttribute("height", h); dash.setAttribute("rx", Math.min(w, h) / 2);
+      // Bird and icon sizes are close, so a quick squash mid-change is what makes it read as a pop.
+      var squashD = Math.sin(Math.PI * clamp(d)), squashL = Math.sin(Math.PI * clamp(l));
+      var r = Math.max(1, lerp(24, 27.5, d)) * (1 - squashD * 0.28);
+      dot.setAttribute("cx", lerp(38, 45, d)); dot.setAttribute("cy", lerp(62, 70, d) - squashD * 5); dot.setAttribute("r", r);
+      var w0 = lerp(30, 32.5, l), h0 = lerp(64, 75, l);
+      var w = Math.max(4, w0 * (1 + squashL * 0.3)), h = Math.max(4, h0 * (1 - squashL * 0.34));
+      var bottom = lerp(86, 97.5, l), cx = lerp(89, 91.25, l);
+      dash.setAttribute("x", cx - w / 2); dash.setAttribute("y", bottom - h); dash.setAttribute("width", w); dash.setAttribute("height", h); dash.setAttribute("rx", Math.min(w, h) / 2);
       fade(groups, 1 - seg(clamp(d), 0, 0.45));
       fade(groups2, 1 - seg(clamp(l), 0, 0.45));
       var gone = clamp(Math.max(d, l));
@@ -602,8 +606,8 @@ code, .mono { font-family: var(--font-mono); }
       var ls = 1 - seg(gone, 0, 0.5);
       show(letter, ls > 0.01);
       if (ls > 0.01) letter.setAttribute("transform", "translate(57 20) scale(" + ls + ") translate(-57 " + (-20 - (1 - ls) * 8) + ")");
-      burst(dotBits, u, [LOGO_OUT[0] + 0.05, LOGO_BACK[0] + 0.05], 34, 60);
-      burst(dashBits, u, [LOGO_OUT[1] + 0.05, LOGO_BACK[1] + 0.05], 84, 58);
+      burst(dotBits, u, [LOGO_OUT[0] + 0.05, LOGO_BACK[0] + 0.05], 42, 66);
+      burst(dashBits, u, [LOGO_OUT[1] + 0.05, LOGO_BACK[1] + 0.05], 90, 60);
     };
   })();
 
