@@ -145,7 +145,7 @@ func TestOnboardGrokBotPastedKey(t *testing.T) {
 		toggle:   []string{itemBot},
 		lines:    []string{"not a url", "https://hooks.example.com/abc/secret-id", ""},
 		secrets:  []string{"", key},
-		confirms: []bool{true},
+		confirms: []bool{true, false},
 	}
 	// The second blank line is the file-path prompt again after an empty paste.
 	p.lines = append(p.lines, "")
@@ -179,10 +179,138 @@ func TestOnboardGrokBotPastedKey(t *testing.T) {
 	if a.Delivery != "webhook" || a.Config["auth_file"] != path {
 		t.Errorf("agent = %+v", a)
 	}
-	for _, want := range []string{"BIRDIE_TOKEN", "tokens/grok-bot", "grok-bot-routine.md"} {
+	for _, want := range []string{"grok-bot-prompt.md", "birdie agent prompt grok-bot"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("next steps lack %q:\n%s", want, out)
 		}
+	}
+}
+
+// botToken reads the token onboarding generated for Grok Bot.
+func botToken(t *testing.T) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(tokenDir(), botAgent))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(b))
+}
+
+func botWizard(confirms ...bool) *fakePrompter {
+	return &fakePrompter{
+		toggle:   []string{itemBot},
+		lines:    []string{"https://hooks.example.com/1", ""},
+		secrets:  []string{"test-key-not-real"},
+		confirms: confirms,
+	}
+}
+
+func TestOnboardGrokBotPromptInTerminal(t *testing.T) {
+	o := fakeTools(t)
+	out, err := runWizard(t, o, botWizard(true, true), noSvc())
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"BIRDIE_URL = http://127.0.0.1:1",
+		"BIRDIE_TOKEN = " + botToken(t),
+		"POST $BIRDIE_URL/v1/messages", // from the routine
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("prompt lacks %q:\n%s", want, out)
+		}
+	}
+	for _, not := range []string{"```", "# Grok Bot routine", "test-key-not-real"} {
+		if strings.Contains(out, not) {
+			t.Errorf("output shouldn't have %q:\n%s", not, out)
+		}
+	}
+	if exists(botPromptPath()) {
+		t.Error("showing the prompt shouldn't also save it")
+	}
+}
+
+func TestOnboardGrokBotPromptInFile(t *testing.T) {
+	o := fakeTools(t)
+	out, err := runWizard(t, o, botWizard(true, false), noSvc())
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	token := botToken(t)
+	if strings.Contains(out, token) {
+		t.Fatalf("saving the prompt shouldn't print the token:\n%s", out)
+	}
+	b, err := os.ReadFile(botPromptPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "BIRDIE_TOKEN = "+token) || !strings.Contains(string(b), "POST $BIRDIE_URL/v1/messages") {
+		t.Errorf("prompt file:\n%s", b)
+	}
+	if fi, _ := os.Stat(botPromptPath()); fi.Mode().Perm() != 0o600 {
+		t.Errorf("prompt file mode = %v", fi.Mode().Perm())
+	}
+
+	// A loose copy from before is replaced with a private one.
+	if err := os.Chmod(botPromptPath(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := saveBotPrompt("new"); err != nil {
+		t.Fatal(err)
+	}
+	if fi, _ := os.Stat(botPromptPath()); fi.Mode().Perm() != 0o600 {
+		t.Errorf("resaved prompt file mode = %v", fi.Mode().Perm())
+	}
+
+	// Disconnecting removes the file, since its token no longer works.
+	p := &fakePrompter{toggle: []string{itemBot}, confirms: []bool{true}}
+	if out, err := runWizard(t, o, p, noSvc()); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if exists(botPromptPath()) {
+		t.Error("the prompt file outlived the agent")
+	}
+}
+
+func TestOnboardGrokBotPromptQuestionCancelled(t *testing.T) {
+	o := fakeTools(t)
+	// The changes are applied before this question, so backing out of it isn't an error.
+	out, err := runWizard(t, o, botWizard(true), noSvc())
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "birdie agent prompt grok-bot") {
+		t.Errorf("doesn't say how to get the prompt later:\n%s", out)
+	}
+	if strings.Contains(out, botToken(t)) || exists(botPromptPath()) {
+		t.Errorf("gave out the prompt anyway:\n%s", out)
+	}
+}
+
+func TestAgentPromptCommand(t *testing.T) {
+	o := fakeTools(t)
+	ctx := context.Background()
+	if err := agentCmd(ctx, []string{"prompt", botAgent, "--db", o.db}); err == nil || !strings.Contains(err.Error(), "birdie onboard") {
+		t.Errorf("before connecting: %v", err)
+	}
+	if out, err := runWizard(t, o, botWizard(true, true), noSvc()); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if err := agentCmd(ctx, []string{"prompt", "codex", "--db", o.db}); err == nil {
+		t.Error("only Grok Bot has a prompt")
+	}
+	if err := agentCmd(ctx, []string{"prompt", botAgent, "--save", "--url", "http://bus.test", "--db", o.db}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(botPromptPath())
+	if !strings.Contains(string(b), "BIRDIE_URL = http://bus.test") {
+		t.Errorf("prompt file:\n%s", b)
+	}
+	if err := agentCmd(ctx, []string{"rm", botAgent, "--db", o.db}); err != nil {
+		t.Fatal(err)
+	}
+	if exists(botPromptPath()) {
+		t.Error("the prompt file outlived the agent")
 	}
 }
 
@@ -193,7 +321,7 @@ func TestOnboardGrokBotKeyFromFileAndRerun(t *testing.T) {
 	p := &fakePrompter{
 		toggle:   []string{itemBot},
 		lines:    []string{"https://hooks.example.com/1", filepath.Join(o.home, "missing"), keyFile},
-		confirms: []bool{true},
+		confirms: []bool{true, false},
 	}
 	if out, err := runWizard(t, o, p, noSvc()); err != nil {
 		t.Fatalf("%v\n%s", err, out)
@@ -216,7 +344,7 @@ func TestOnboardGrokBotKeyFromFileAndRerun(t *testing.T) {
 
 	// Changing the URL keeps the token.
 	p = &fakePrompter{
-		confirms: []bool{true, true},
+		confirms: []bool{true, true, false},
 		lines:    []string{"https://new.example.com/2", keyFile},
 	}
 	if out, err := runWizard(t, o, p, noSvc()); err != nil {

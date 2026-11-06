@@ -45,6 +45,7 @@ Usage:
   birdie agent describe NAME TEXT
   birdie agent list
   birdie agent rm NAME
+  birdie agent prompt grok-bot [--save] [--url URL]
   birdie session list
   birdie session default AGENT [NAME]
   birdie send --as NAME --to AGENT[/SESSION] [--thread ID] [--context TEXT] [--wanted TEXT] MESSAGE
@@ -359,7 +360,7 @@ func inbox(ctx context.Context, args []string) error {
 
 func agentCmd(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: birdie agent add|list|rm")
+		return errors.New("usage: birdie agent add|list|rm|prompt")
 	}
 	fs := flag.NewFlagSet("agent "+args[0], flag.ContinueOnError)
 	db := fs.String("db", defaultDB(), "SQLite database path")
@@ -372,6 +373,8 @@ func agentCmd(ctx context.Context, args []string) error {
 	permission := fs.String("permission", "reject", "ACP tool calls that ask for approval: reject or allow")
 	timeout := fs.Duration("timeout", 0, "longest an ACP turn may run (default 20m)")
 	maxReplies := fs.Int("max-replies", -1, "ACP answers per thread before the agent stops replying (default 10, 0 = no limit)")
+	url := fs.String("url", envOr("BIRDIE_URL", defaultURL), "birdie base URL to put in the prompt")
+	save := fs.Bool("save", false, "save the prompt to a private file instead of printing it")
 	pos, err := parse(fs, args[1:])
 	if err != nil {
 		return err
@@ -411,7 +414,31 @@ func agentCmd(ctx context.Context, args []string) error {
 			return fmt.Errorf("remove %q: %w", pos[0], err)
 		}
 		os.Remove(filepath.Join(tokenDir(), pos[0]))
+		if pos[0] == botAgent {
+			os.Remove(botPromptPath()) // it holds the token just deleted
+		}
 		fmt.Printf("removed %s\n", pos[0])
+		return nil
+	case "prompt":
+		if len(pos) != 1 || pos[0] != botAgent {
+			return errors.New("usage: birdie agent prompt " + botAgent + " [--save]")
+		}
+		if _, err := st.GetAgent(ctx, botAgent); err != nil {
+			return fmt.Errorf("%s isn't connected yet; run: birdie onboard", botAgent)
+		}
+		prompt, err := botPrompt(*url)
+		if err != nil {
+			return err
+		}
+		if !*save {
+			fmt.Println(prompt)
+			return nil
+		}
+		path, err := saveBotPrompt(prompt)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("saved to %s\n", path)
 		return nil
 	case "add":
 		if len(pos) != 1 || !bus.ValidName(pos[0]) {

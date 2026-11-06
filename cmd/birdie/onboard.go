@@ -466,6 +466,9 @@ func (w *wizard) deleteAgent(name string) error {
 	if err := os.Remove(filepath.Join(tokenDir(), name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
+	if name == botAgent {
+		os.Remove(botPromptPath()) // it holds the token just deleted
+	}
 	fmt.Fprintf(w.out, "deleted agent %s\n", name)
 	return nil
 }
@@ -554,18 +557,44 @@ func (w *wizard) nextSteps(plan wizardPlan) {
 			break
 		}
 	}
-	if plan.bot != nil {
-		steps = append(steps,
-			"In the Grok Bot routine, add the secret BIRDIE_URL = "+defaultURL+".",
-			"Add the secret BIRDIE_TOKEN, pasting the contents of "+filepath.Join(tokenDir(), botAgent)+".",
-			"Paste the routine text from "+routinePath()+" into the routine.",
-		)
+	if len(steps) > 0 {
+		fmt.Fprintln(w.out, "\nWhat's next:")
+		for i, s := range steps {
+			fmt.Fprintf(w.out, "  %d. %s\n", i+1, s)
+		}
 	}
-	if len(steps) == 0 {
+	if plan.bot != nil {
+		w.giveBotPrompt()
+	}
+}
+
+// giveBotPrompt hands over the prompt that finishes Grok Bot's setup, in the
+// terminal or as a file. The agent is already registered by now, so a failure
+// here only leaves the user a command to get the prompt later.
+func (w *wizard) giveBotPrompt() {
+	const later = "Get the prompt at any time with: birdie agent prompt " + botAgent
+	prompt, err := botPrompt(w.url)
+	if err != nil {
+		fmt.Fprintf(w.out, "\nCan't build Grok Bot's prompt: %v\n", err)
 		return
 	}
-	fmt.Fprintln(w.out, "\nWhat's next:")
-	for i, s := range steps {
-		fmt.Fprintf(w.out, "  %d. %s\n", i+1, s)
+	fmt.Fprintln(w.out, "\nTo finish, give Grok Bot one prompt. It has the routine's instructions, the bus address and Grok Bot's token.")
+	show, err := w.p.confirm("Show it here? It includes the token, so No saves it to a private file instead.", false)
+	if err != nil {
+		fmt.Fprintln(w.out, later)
+		return
 	}
+	if show {
+		fmt.Fprintf(w.out, "\n----- Copy from the next line -----\n%s\n----- Copy up to the line above -----\n", prompt)
+		fmt.Fprintln(w.out, "Paste it into a Grok Bot chat. Treat it like a password, because it includes the token.")
+		return
+	}
+	path, err := saveBotPrompt(prompt)
+	if err != nil {
+		fmt.Fprintf(w.out, "Can't save the prompt: %v\n%s\n", err, later)
+		return
+	}
+	fmt.Fprintf(w.out, "Saved to %s, where only you can read it.\n", path)
+	fmt.Fprintln(w.out, "Paste or attach it in a Grok Bot chat, then delete the file, because it includes the token.")
+	fmt.Fprintln(w.out, later)
 }

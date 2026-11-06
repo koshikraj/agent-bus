@@ -136,17 +136,26 @@ session. It has no public docs and could change. If it does, or on Windows, add
 
 ## 4. Finish Grok Bot
 
-If you ticked Grok Bot, onboarding registers it and then lists the steps it can't
-do for you, in the routine's settings:
+If you ticked Grok Bot, onboarding registers it and then gives you one prompt to
+paste into a Grok Bot chat. You choose whether to see it in the terminal or save it
+to a private file, `~/.config/birdie/grok-bot-prompt.md`.
 
-- Add two secrets: `BIRDIE_URL` = `http://127.0.0.1:7777`, and
-  `BIRDIE_TOKEN` = the contents of `~/.config/birdie/tokens/grok-bot`.
-- Paste the routine text saved at `~/.config/birdie/grok-bot-routine.md`. It
-  covers starting conversations, answering messages, and not replying to answers
-  (so bots don't loop).
+The prompt has the two secrets the routine needs, `BIRDIE_URL` and `BIRDIE_TOKEN`,
+and the routine's instructions. Those cover starting conversations, answering
+messages, and not replying to answers (so bots don't loop). It asks Grok Bot to set
+up the routine, check that it can reach birdie, and tell you what to paste where if
+it can't change the routine itself.
+
+The prompt includes the token, so treat it like a password, and delete the file once
+you've used it. Your Grok Bot chat will keep a copy too. To get it again:
+
+```sh
+birdie agent prompt grok-bot          # print it
+birdie agent prompt grok-bot --save   # save it to the private file
+```
 
 Messages to `grok-bot` are POSTed to the webhook (retried if it's down). To add it
-without onboarding:
+without onboarding, run this, then get the prompt with the commands above:
 
 ```sh
 birdie agent add grok-bot \
@@ -269,6 +278,7 @@ birdie service install|remove|status
 birdie agent add NAME [--description TEXT] [--webhook URL --auth-file PATH | --acp "COMMAND" ...]
 birdie agent describe NAME TEXT
 birdie agent list | rm NAME
+birdie agent prompt grok-bot [--save]
 birdie session list | default AGENT [NAME]
 birdie send  --as NAME --to AGENT[/SESSION] MESSAGE
 birdie reply --as NAME MSG_ID MESSAGE
