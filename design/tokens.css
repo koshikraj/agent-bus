@@ -1,0 +1,180 @@
+/* birdie: generated from tokens.json. Change tokens.json, then keep this file in step. */
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --brand-tomato: #FF5533;
+  --brand-tomato-deep: #D93A1C;
+  --brand-teal: #0B6E69;
+  --brand-teal-deep: #08524E;
+  --brand-teal-bright: #4FD1C5;
+  --brand-butter: #FFE9A8;
+  --brand-mint: #DCF5E8;
+  --brand-ink: #0A2E2B;
+  --ground: #DCF5E8;
+  --surface: #FBFEFC;
+  --stage: #FFE9A8;
+  --on-stage: #0A2E2B;
+  --ink: #0A2E2B;
+  --ink-muted: #2F5C58;
+  --border: #4F7A75;
+  --divider: #B9DFCE;
+  --action: #0A2E2B;
+  --on-action: #FFFFFF;
+  --action-hover: #0B6E69;
+  --accent: #0B6E69;
+  --on-accent: #FFFFFF;
+  --bubble-in: #DCF5E8;
+  --bubble-out: #0B6E69;
+  --on-bubble-out: #FFFFFF;
+  --signal: #FF5533;
+  --on-signal: #0A2E2B;
+  --danger: #B3300F;
+  --focus: #0B6E69;
+  --bird-dot: #FF5533;
+  --bird-dot-wing: #D93A1C;
+  --bird-dash: #0B6E69;
+  --bird-dash-wing: #08524E;
+  --bird-line: #0A2E2B;
+  --bird-eye: #FFFFFF;
+  --bird-pupil: #0A2E2B;
+  --letter: #FFFFFF;
+  --letter-edge: #0A2E2B;
+  --letter-fold-request: #FF5533;
+  --letter-fold-reply: #0B6E69;
+  --mark-letter: #0A2E2B;
+  --mark-fold: #FFFFFF;
+  --agent-1: #FF5533;
+  --agent-2: #0B6E69;
+  --agent-3: #F2B705;
+  --agent-4: #6B4EE6;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --brand-tomato: #FF5533;
+  --brand-tomato-deep: #D93A1C;
+  --brand-teal: #0B6E69;
+  --brand-teal-deep: #08524E;
+  --brand-teal-bright: #4FD1C5;
+  --brand-butter: #FFE9A8;
+  --brand-mint: #DCF5E8;
+  --brand-ink: #0A2E2B;
+  --ground: #0A2E2B;
+  --surface: #103B37;
+  --stage: #164541;
+  --on-stage: #EAF7F1;
+  --ink: #EAF7F1;
+  --ink-muted: #A8CFC7;
+  --border: #6FA39B;
+  --divider: #1F524C;
+  --action: #4FD1C5;
+  --on-action: #0A2E2B;
+  --action-hover: #7FE0D6;
+  --accent: #4FD1C5;
+  --on-accent: #0A2E2B;
+  --bubble-in: #1A4A45;
+  --bubble-out: #4FD1C5;
+  --on-bubble-out: #0A2E2B;
+  --signal: #FF6F52;
+  --on-signal: #0A2E2B;
+  --danger: #FF9B82;
+  --focus: #4FD1C5;
+  --bird-dot: #FF5533;
+  --bird-dot-wing: #D93A1C;
+  --bird-dash: #4FD1C5;
+  --bird-dash-wing: #2BA89C;
+  --bird-line: #EAF7F1;
+  --bird-eye: #FFFFFF;
+  --bird-pupil: #0A2E2B;
+  --letter: #FFFFFF;
+  --letter-edge: #0A2E2B;
+  --letter-fold-request: #FF5533;
+  --letter-fold-reply: #0B6E69;
+  --mark-letter: #FFFFFF;
+  --mark-fold: #0A2E2B;
+  --agent-1: #FF5533;
+  --agent-2: #4FD1C5;
+  --agent-3: #F2B705;
+  --agent-4: #9A82F2;
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 40px;
+  --space-8: 64px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-icon: 17px;
+  --radius-full: 999px;
+  --control-height: 48px;
+  --wire-weight: 6px;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-text: "DM Sans", system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, monospace;
+}
+.display-xl {
+  font-family: var(--font-display);
+  font-size: 68px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+.display-lg {
+  font-family: var(--font-display);
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.display-md {
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1.04;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.body-lg {
+  font-family: var(--font-text);
+  font-size: 17px;
+  line-height: 1.35;
+  font-weight: 400;
+}
+.body {
+  font-family: var(--font-text);
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.body-sm {
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 400;
+}
+.label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.25;
+  font-weight: 500;
+}
+.code {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 400;
+}
+.caption {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 400;
+}

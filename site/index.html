@@ -1,0 +1,1033 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>birdie: give your agents a way to talk</title>
+<meta name="description" content="birdie lets the AI agents on your machine message each other, with verified senders and answers that return to the session that asked.">
+<meta property="og:title" content="birdie: give your agents a way to talk">
+<meta property="og:description" content="birdie lets the AI agents on your machine message each other, with verified senders and answers that return to the session that asked.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJiaXJkaWUgc21hbGwgaWNvbiI+PHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiByeD0iNiIgZmlsbD0iI0RDRjVFOCIvPjxjaXJjbGUgY3g9IjkiIGN5PSIxNCIgcj0iNS41IiBmaWxsPSIjRkY1NTMzIi8+PHJlY3QgeD0iMTUiIHk9IjQuNSIgd2lkdGg9IjYuNSIgaGVpZ2h0PSIxNSIgcng9IjMuMjUiIGZpbGw9IiMwQjZFNjkiLz48L3N2Zz4K">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Mono:wght@400;500&family=JetBrains+Mono:wght@400;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">
+<style>
+/* Layout: one wire runs edge to edge through the hero, then three bands: night for the flow, ground for install, tomato to close.
+   Colors and type are the birdie design tokens (design/tokens.json). */
+:root {
+  --tomato: #FF5533; --tomato-deep: #D93A1C; --brand-ink: #0A2E2B; --brand-butter: #FFE9A8; --brand-teal-bright: #4FD1C5;
+  --ground: #DCF5E8; --surface: #FBFEFC; --stage: #FFE9A8; --ink: #0A2E2B; --ink-muted: #2F5C58; --divider: #B9DFCE; --border: #4F7A75;
+  --action: #0A2E2B; --on-action: #FFFFFF; --action-hover: #0B6E69; --accent: #0B6E69; --on-accent: #FFFFFF; --focus: #0B6E69;
+  --bird-line: #0A2E2B; --bird-eye: #FFFFFF; --bird-pupil: #0A2E2B; --letter: #FFFFFF; --letter-edge: #0A2E2B;
+  --fold-request: #FF5533; --fold-reply: #0B6E69; --mark-letter: #0A2E2B; --mark-fold: #FFFFFF;
+  --agent-1: #FF5533; --agent-1-wing: #D93A1C; --agent-1-on: #0A2E2B;
+  --agent-2: #0B6E69; --agent-2-wing: #08524E; --agent-2-on: #FFFFFF;
+  --agent-3: #F2B705; --agent-3-wing: #C99700; --agent-3-on: #0A2E2B;
+  --agent-4: #6B4EE6; --agent-4-wing: #5238C2; --agent-4-on: #FFFFFF;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-text: "DM Sans", system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, Menlo, Consolas, monospace;
+  --gutter: clamp(16px, 4vw, 40px);
+  --font-term: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --t-bg: #262C2F; --t-bar: #1B2022; --t-ink: #E6EAEB; --t-dim: #8B9599; --t-rule: #5A6468; --t-band: #3A4246; --t-crab: #D97757; --t-yellow: #E5B93C; --t-blue: #6CB2F0; --t-model: #E8DFA6; --t-green: #A9D47A; --t-gold: #FFD700; --t-bronze: #CD7F32; --t-cream: #FFF8DC;
+  --c-bg: #FAFAF8; --c-in: #EDEDEB; --c-ink: #1B1B1A; --c-dim: #8A8A85; --c-line: #DEDED9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0A2E2B; --surface: #103B37; --stage: #164541; --ink: #EAF7F1; --ink-muted: #A8CFC7; --divider: #1F524C; --border: #6FA39B;
+    --action: #4FD1C5; --on-action: #0A2E2B; --action-hover: #7FE0D6; --accent: #4FD1C5; --on-accent: #0A2E2B; --focus: #4FD1C5;
+    --bird-line: #EAF7F1; --mark-letter: #FFFFFF; --mark-fold: #0A2E2B;
+    --agent-2: #4FD1C5; --agent-2-wing: #2BA89C; --agent-2-on: #0A2E2B;
+    --agent-4: #9A82F2; --agent-4-wing: #7A60DD; --agent-4-on: #0A2E2B;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0A2E2B; --surface: #103B37; --stage: #164541; --ink: #EAF7F1; --ink-muted: #A8CFC7; --divider: #1F524C; --border: #6FA39B;
+  --action: #4FD1C5; --on-action: #0A2E2B; --action-hover: #7FE0D6; --accent: #4FD1C5; --on-accent: #0A2E2B; --focus: #4FD1C5;
+  --bird-line: #EAF7F1; --mark-letter: #FFFFFF; --mark-fold: #0A2E2B;
+  --agent-2: #4FD1C5; --agent-2-wing: #2BA89C; --agent-2-on: #0A2E2B;
+  --agent-4: #9A82F2; --agent-4-wing: #7A60DD; --agent-4-on: #0A2E2B;
+}
+/* The flow band is night in both themes. */
+.night {
+  --ground: #0A2E2B; --surface: #103B37; --stage: #164541; --ink: #EAF7F1; --ink-muted: #A8CFC7; --divider: #1F524C; --border: #6FA39B;
+  --action: #4FD1C5; --on-action: #0A2E2B; --action-hover: #7FE0D6; --accent: #4FD1C5; --on-accent: #0A2E2B; --focus: #4FD1C5;
+  --bird-line: #EAF7F1;
+  --agent-2: #4FD1C5; --agent-2-wing: #2BA89C; --agent-2-on: #0A2E2B;
+  --agent-4: #9A82F2; --agent-4-wing: #7A60DD; --agent-4-on: #0A2E2B;
+  background: var(--ground); color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 400 17px/1.5 var(--font-text); overflow-x: clip; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3, p, ol, ul { margin: 0; padding: 0; }
+ol, ul { list-style: none; }
+h1, h2 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.04em; line-height: 0.98; text-wrap: balance; }
+h1 { font-size: clamp(46px, 7vw, 92px); }
+h2 { font-size: clamp(36px, 5vw, 64px); }
+.wrap { max-width: 1240px; margin-inline: auto; padding-left: max(var(--gutter), env(safe-area-inset-left, 0px)); padding-right: max(var(--gutter), env(safe-area-inset-right, 0px)); }
+.lede { font-size: clamp(17px, 1.6vw, 20px); line-height: 1.45; max-width: 58ch; }
+code, .mono { font-family: var(--font-mono); }
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Header */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; padding-block: 16px; }
+.brand { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font: 800 28px/1 var(--font-display); letter-spacing: -0.04em; }
+.brand svg { width: 44px; height: 44px; display: block; }
+.links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font: 500 14px/1.2 var(--font-mono); }
+.links a { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding-inline: 10px; border-radius: 4px; text-decoration: none; white-space: nowrap; }
+.links a:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.links svg { width: 17px; height: 17px; flex: none; fill: currentColor; }
+
+/* Hero */
+.hero { background: var(--stage); overflow-x: clip; }
+.hero-copy { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px 48px; align-items: end; padding-block: 12px 4px; }
+.hero-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.stage { position: relative; padding-bottom: 20px; }
+.stage svg { display: block; width: 100%; height: auto; overflow: visible; }
+.stage-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; }
+.caption { font: 700 clamp(17px, 1.9vw, 22px)/1.2 var(--font-display); letter-spacing: -0.02em; min-width: 0; }
+.ctl { flex: none; min-height: 44px; padding: 0 14px; border: 2px solid var(--border); border-radius: 4px; background: transparent; color: var(--ink); font: 500 13px/1 var(--font-mono); cursor: pointer; }
+.ctl:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+
+/* Install command */
+.cmd { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 4px; background: var(--action); color: var(--on-action); min-width: 0; }
+.cmd code { flex: 1; min-width: 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.cmd code::before { content: "$ "; opacity: 0.6; }
+.cmd button { flex: none; min-height: 44px; min-width: 72px; padding: 0 12px; border: 2px solid var(--on-action); border-radius: 4px; background: transparent; color: var(--on-action); font: 500 13px/1 var(--font-mono); cursor: pointer; }
+.cmd button:hover { background: color-mix(in srgb, var(--on-action) 16%, transparent); }
+.cmd button:focus-visible { outline-color: var(--on-action); }
+
+/* Flow */
+.flow { padding-block: clamp(48px, 7vw, 88px); }
+.flow-head { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px 48px; align-items: end; }
+.flow-head p { color: var(--ink-muted); }
+.miles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-block: 36px 28px; }
+.miles li { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.miles li:not(:last-child)::after { content: ""; position: absolute; top: 24px; left: 56px; right: 8px; height: 4px; border-radius: 2px; background: var(--divider); transition: background .3s; }
+.miles li[data-s="done"]:not(:last-child)::after { background: var(--brand-teal-bright); }
+.pi { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: var(--surface); color: var(--ink-muted); box-shadow: inset 0 0 0 2px var(--divider); transition: background .3s, color .3s, box-shadow .3s; }
+.pi svg { width: 26px; height: 26px; display: block; }
+.miles li[data-s="active"] .pi { background: var(--tomato); color: var(--brand-ink); box-shadow: 0 0 0 5px color-mix(in srgb, var(--tomato) 30%, transparent); }
+.miles li[data-s="done"] .pi { background: var(--brand-teal-bright); color: var(--brand-ink); box-shadow: none; }
+.pn { display: flex; flex-direction: column; gap: 1px; font: 700 clamp(16px, 1.6vw, 20px)/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-muted); transition: color .3s; }
+.pn small { font: 400 13px/1.3 var(--font-mono); letter-spacing: 0; color: var(--ink-muted); }
+.miles li[data-s="active"] .pn, .miles li[data-s="done"] .pn { color: var(--ink); }
+.flow-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px 40px; align-items: start; }
+.flow-stage { min-width: 0; }
+.flow-stage svg { display: block; width: 100%; height: auto; }
+.flow-foot { display: flex; justify-content: flex-end; }
+.flow-side { min-width: 0; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* One real-looking screen per agent, shown while that agent is acting. */
+.desk { border-radius: 10px; overflow: hidden; background: var(--t-bar); box-shadow: 0 0 0 1px #000, 0 18px 44px rgb(0 0 0 / 0.32); }
+.tabs { display: flex; gap: 2px; padding: 6px 6px 0; overflow-x: auto; scrollbar-width: none; }
+.tab { display: inline-flex; align-items: center; gap: 7px; flex: 1 1 0; min-width: 0; min-height: 40px; padding: 0 10px; border: 0; border-radius: 7px 7px 0 0; background: transparent; color: var(--t-dim); font: 400 12.500px/1 var(--font-term); white-space: nowrap; cursor: pointer; }
+.tab:hover { color: var(--t-ink); }
+.tab[aria-pressed="true"] { background: var(--t-bg); color: var(--t-ink); }
+.tab[data-w="grokbot"][aria-pressed="true"] { background: var(--c-bg); color: var(--c-ink); }
+.tab:focus-visible { outline-offset: -2px; }
+.tab i { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 5px; background: #FFFFFF; }
+.tab svg { width: 16px; height: 16px; display: block; }
+.wins { position: relative; height: 468px; background: var(--t-bg); }
+.win { position: absolute; inset: 0; display: flex; flex-direction: column; opacity: 0; visibility: hidden; transition: opacity .22s, visibility 0s .22s; }
+.win.on { opacity: 1; visibility: visible; transition: opacity .22s; }
+/* Lines fill from the top; once full, the newest stay in view and old ones scroll off. */
+.scr { flex: 1; min-height: 0; display: flex; flex-direction: column-reverse; overflow: hidden; padding: 14px 14px 10px; }
+.col { flex: none; display: flex; flex-direction: column; gap: 9px; margin-bottom: auto; }
+.term { background: var(--t-bg); color: var(--t-ink); font: 400 clamp(12px, 1vw, 13.500px)/1.5 var(--font-term); }
+.ln { flex: none; overflow-wrap: anywhere; }
+.ln .r { visibility: hidden; }
+.dim { color: var(--t-dim); }
+.term b { font-weight: 700; }
+.sh { background: linear-gradient(90deg, currentColor 35%, #FFFFFF 50%, currentColor 65%); background-size: 240% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 1.8s linear infinite; }
+@keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.banner { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 14px; align-items: center; }
+.banner svg { width: 66px; height: 66px; grid-row: span 3; color: var(--t-crab); margin-block: -6px; }
+.cur { display: inline-block; width: 0.6em; height: 1.15em; margin-right: -0.6em; vertical-align: -0.2em; background: currentColor; }
+.win:not(.on) .cur { visibility: hidden; }
+/* Claude Code */
+.w-claude .band { margin-inline: -14px; padding: 2px 14px; background: #30373A; }
+.w-claude .prompt { color: var(--t-dim); }
+.w-claude .tool { color: var(--t-dim); margin-left: 2ch; }
+.w-claude .spin { color: var(--t-crab); }
+.w-claude .spin .dim { color: var(--t-dim); }
+.msgin { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1ch; }
+.msgin > span:first-child { color: var(--t-dim); }
+.msgin b { font-weight: 400; color: var(--t-crab); }
+.comp-claude { flex: none; padding: 0 14px 12px; }
+.comp-claude .box { border-block: 1px solid var(--t-rule); margin-inline: -14px; padding: 5px 14px; min-height: 2.2em; }
+.comp-claude .auto { margin-top: 8px; padding-left: 2ch; color: var(--t-yellow); }
+/* Codex */
+.w-codex .band { margin-inline: -14px; padding: 8px 14px; background: var(--t-band); }
+.w-codex .blt { color: var(--t-dim); }
+.w-codex .blt-on { color: var(--t-green); }
+.w-codex .out { display: block; padding-left: 2ch; color: var(--t-dim); }
+.w-codex .fn { color: var(--t-blue); }
+.w-codex .box { display: inline-block; padding: 6px 12px; border: 1px solid var(--t-rule); border-radius: 4px; }
+.comp-codex { flex: none; }
+.comp-codex .input { padding: 12px 14px; background: var(--t-band); }
+.comp-codex .ph { color: var(--t-dim); }
+.comp-codex .meta { padding: 8px 14px 12px; color: var(--t-model); }
+/* Hermes */
+.w-hermes .gold { color: var(--t-gold); font-weight: 700; }
+.w-hermes .acc { color: var(--t-cream); }
+.w-hermes .box { display: inline-block; padding: 6px 12px; border: 1px solid var(--t-bronze); border-radius: 4px; color: var(--t-cream); }
+.w-hermes .bar { display: block; width: min(40ch, 100%); height: 1px; margin-bottom: 4px; background: var(--t-gold); }
+.comp-hermes { flex: none; padding: 0 14px 12px; }
+.comp-hermes .rule { display: flex; align-items: center; color: var(--t-bronze); white-space: nowrap; overflow: hidden; }
+.comp-hermes .rule::after { content: ""; flex: 1; height: 1px; background: var(--t-bronze); }
+.comp-hermes .rule::before { content: ""; flex: none; width: 2ch; height: 1px; background: var(--t-bronze); }
+.comp-hermes .rule b { font-weight: 400; color: var(--t-gold); }
+.comp-hermes .rule b:not(:empty) { padding-inline: 1ch; }
+.comp-hermes .input { padding-block: 5px; }
+.comp-hermes .low { height: 1px; background: var(--t-bronze); }
+.comp-hermes .meta { padding-top: 7px; color: var(--t-dim); overflow-wrap: anywhere; }
+/* Grok Bot's chat window */
+.w-grokbot { background: var(--c-bg); color: var(--c-ink); font: 400 15px/1.35 var(--font-text); }
+.w-grokbot .col { gap: 6px; margin-bottom: 0; }
+.w-grokbot .when { align-self: center; color: var(--c-dim); font-size: 12px; margin-block: 2px 8px; }
+.bub { flex: none; max-width: 82%; padding: 8px 13px; border-radius: 16px; background: var(--c-in); color: var(--c-ink); align-self: flex-start; }
+.bub.me { align-self: flex-end; background: #1B1B1A; color: #FFFFFF; }
+.bub.me + .bub:not(.me), .bub:not(.me) + .bub.me { margin-top: 10px; }
+.act { flex: none; display: flex; align-items: center; gap: 9px; margin-top: 4px; color: var(--c-dim); font-size: 14px; }
+.act .sh { background-image: linear-gradient(90deg, #8A8A85 35%, #1B1B1A 50%, #8A8A85 65%); }
+.eyes { display: inline-flex; align-items: center; justify-content: center; gap: 2.500px; flex: none; width: 24px; height: 24px; border-radius: 50%; background: #111111; }
+.eyes i { width: 4.500px; height: 9px; border-radius: 3px; background: #FFFFFF; animation: look 2.4s ease-in-out infinite; }
+@keyframes look { 0%, 44%, 56%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.15); } }
+.chatbox { flex: none; display: flex; align-items: center; gap: 8px; margin: 2px 14px 14px; padding: 6px 7px; border: 1px solid var(--c-line); border-radius: 22px; background: #FFFFFF; color: var(--c-dim); font-size: 14px; }
+.chatbox span { flex: 1; min-width: 0; }
+.chatbox .ci { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; background: #EFEFEC; color: #55554F; font-size: 17px; line-height: 1; }
+.chatbox .wave { background: #111111; color: #FFFFFF; font-size: 11px; letter-spacing: -1px; }
+.note { margin-top: 14px; font-size: 14px; line-height: 1.45; color: var(--ink-muted); }
+.note code { white-space: nowrap; color: var(--ink); }
+[hidden] { display: none !important; }
+
+/* Install */
+.install { padding-block: clamp(40px, 5vw, 64px); }
+.install h2 { margin-bottom: 24px; }
+.steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.step { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 18px 20px 20px; border-radius: 6px; background: var(--surface); }
+.step-1 { grid-column: 1 / -1; }
+.step h3 { display: flex; align-items: baseline; gap: 10px; font: 800 24px/1.1 var(--font-display); letter-spacing: -0.03em; }
+.step h3 span { color: var(--tomato-deep); }
+:root[data-theme="dark"] .step h3 span { color: var(--tomato); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .step h3 span { color: var(--tomato); } }
+.step p { font-size: 16px; line-height: 1.4; color: var(--ink-muted); max-width: 70ch; }
+.step code.inl { font-size: 14px; color: var(--ink); }
+.step-1 .cmd code { font-size: clamp(13px, 1.5vw, 17px); }
+.ticks { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 16px; font: 400 14px/1.3 var(--font-mono); }
+.ticks li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ticks i { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 3px; }
+.ticks .on i { background: var(--accent); border-color: var(--accent); }
+.ticks svg { width: 11px; height: 11px; fill: var(--on-accent); }
+.chat { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.chat span { max-width: 100%; padding: 8px 12px; border-radius: 4px; font-size: 16px; line-height: 1.3; }
+.chat .me { background: var(--accent); color: var(--on-accent); }
+.chat .them { background: var(--ground); color: var(--ink); }
+.fine { margin-top: 16px; font-size: 14px; line-height: 1.45; color: var(--ink-muted); max-width: 95ch; }
+.fine a { font-weight: 600; }
+
+/* Close */
+.close { background: var(--tomato); color: var(--brand-ink); --focus: var(--brand-ink); }
+.close-in { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px 48px; align-items: end; padding-block: clamp(40px, 6vw, 72px) 24px; }
+.close h2 { max-width: 12ch; }
+.close .links { font-size: 15px; justify-content: flex-end; }
+.close .links a { border: 2px solid var(--brand-ink); padding-inline: 14px; }
+.close .links a:hover { background: var(--brand-ink); color: var(--tomato); }
+.close-note { padding-bottom: 24px; font: 400 13px/1.5 var(--font-mono); }
+
+@media (max-width: 1180px) {
+  .tab { flex: 0 0 auto; padding: 0 9px; }
+  .tab[aria-pressed="true"] { flex: 1 1 auto; }
+  .tab:not([aria-pressed="true"]) .nm { display: none; }
+}
+@media (max-width: 900px) {
+  .hero-copy, .flow-head, .flow-grid, .close-in { grid-template-columns: minmax(0, 1fr); }
+  .close .links { justify-content: flex-start; }
+}
+@media (max-width: 640px) {
+  .steps { grid-template-columns: minmax(0, 1fr); }
+  .pi { width: 44px; height: 44px; border-radius: 12px; }
+  .pi svg { width: 22px; height: 22px; }
+  .miles li:not(:last-child)::after { top: 20px; left: 48px; right: 4px; }
+  .pn small { font-size: 12px; }
+  .wins { height: 452px; }
+  .w-grokbot { font-size: 14.500px; }
+  .links a { padding-inline: 8px; }
+  .cmd { flex-wrap: wrap; }
+  .cmd code { flex-basis: 100%; }
+  .cmd button { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .pi, .pn, .miles li::after { transition: none; } .win { transition: none; } .sh { animation: none; background: none; -webkit-text-fill-color: currentColor; } .eyes i { animation: none; } }
+</style>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" focusable="false"><symbol id="i-claudecode" viewBox="0 0 24 24" fill="currentColor"><g fill-rule="evenodd"><path clip-rule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"></path></g></symbol><symbol id="i-codex" viewBox="0 0 24 24" fill="currentColor"><path d="M9.064 3.344a4.578 4.578 0 012.285-.312c1 .115 1.891.54 2.673 1.275.01.01.024.017.037.021a.09.09 0 00.043 0 4.55 4.55 0 013.046.275l.047.022.116.057a4.581 4.581 0 012.188 2.399c.209.51.313 1.041.315 1.595a4.24 4.24 0 01-.134 1.223.123.123 0 00.03.115c.594.607.988 1.33 1.183 2.17.289 1.425-.007 2.71-.887 3.854l-.136.166a4.548 4.548 0 01-2.201 1.388.123.123 0 00-.081.076c-.191.551-.383 1.023-.74 1.494-.9 1.187-2.222 1.846-3.711 1.838-1.187-.006-2.239-.44-3.157-1.302a.107.107 0 00-.105-.024c-.388.125-.78.143-1.204.138a4.441 4.441 0 01-1.945-.466 4.544 4.544 0 01-1.61-1.335c-.152-.202-.303-.392-.414-.617a5.81 5.81 0 01-.37-.961 4.582 4.582 0 01-.014-2.298.124.124 0 00.006-.056.085.085 0 00-.027-.048 4.467 4.467 0 01-1.034-1.651 3.896 3.896 0 01-.251-1.192 5.189 5.189 0 01.141-1.6c.337-1.112.982-1.985 1.933-2.618.212-.141.413-.251.601-.33.215-.089.43-.164.646-.227a.098.098 0 00.065-.066 4.51 4.51 0 01.829-1.615 4.535 4.535 0 011.837-1.388zm3.482 10.565a.637.637 0 000 1.272h3.636a.637.637 0 100-1.272h-3.636zM8.462 9.23a.637.637 0 00-1.106.631l1.272 2.224-1.266 2.136a.636.636 0 101.095.649l1.454-2.455a.636.636 0 00.005-.64L8.462 9.23z" fill="url(#lobe-icons-codex-_R_0_)"></path><defs><linearGradient gradientUnits="userSpaceOnUse" id="lobe-icons-codex-_R_0_" x1="12" x2="12" y1="3" y2="21"><stop stop-color="#B1A7FF"></stop><stop offset=".5" stop-color="#7A9DFF"></stop><stop offset="1" stop-color="#3941FF"></stop></linearGradient></defs></symbol><symbol id="i-codex-mono" viewBox="0 0 24 24" fill="currentColor"><g fill-rule="evenodd"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></g></symbol><symbol id="i-grok" viewBox="0 0 24 24" fill="currentColor"><g fill-rule="evenodd"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></g></symbol><symbol id="i-hermes" viewBox="0 0 180 180"><image href="data:image/png;base64,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" width="180" height="180"/></symbol><symbol id="i-figma" viewBox="0 0 24 24" fill="currentColor"><path d="M15.852 8.981h-4.588V0h4.588c2.476 0 4.49 2.014 4.49 4.49s-2.014 4.491-4.49 4.491zM12.735 7.51h3.117c1.665 0 3.019-1.355 3.019-3.019s-1.355-3.019-3.019-3.019h-3.117V7.51zm0 1.471H8.148c-2.476 0-4.49-2.014-4.49-4.49S5.672 0 8.148 0h4.588v8.981zm-4.587-7.51c-1.665 0-3.019 1.355-3.019 3.019s1.354 3.02 3.019 3.02h3.117V1.471H8.148zm4.587 15.019H8.148c-2.476 0-4.49-2.014-4.49-4.49s2.014-4.49 4.49-4.49h4.588v8.98zM8.148 8.981c-1.665 0-3.019 1.355-3.019 3.019s1.355 3.019 3.019 3.019h3.117V8.981H8.148zM8.172 24c-2.489 0-4.515-2.014-4.515-4.49s2.014-4.49 4.49-4.49h4.588v4.441c0 2.503-2.047 4.539-4.563 4.539zm-.024-7.51a3.023 3.023 0 0 0-3.019 3.019c0 1.665 1.365 3.019 3.044 3.019 1.705 0 3.093-1.376 3.093-3.068v-2.97H8.148zm7.704 0h-.098c-2.476 0-4.49-2.014-4.49-4.49s2.014-4.49 4.49-4.49h.098c2.476 0 4.49 2.014 4.49 4.49s-2.014 4.49-4.49 4.49zm-.097-7.509c-1.665 0-3.019 1.355-3.019 3.019s1.355 3.019 3.019 3.019h.098c1.665 0 3.019-1.355 3.019-3.019s-1.355-3.019-3.019-3.019h-.098z"/></symbol><symbol id="i-github" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></symbol><symbol id="i-vercel" viewBox="0 0 24 24" fill="currentColor"><path d="m12 1.608 12 20.784H0Z"/></symbol></svg>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <nav class="top" aria-label="Main">
+      <a class="brand" href="#top" aria-label="birdie home">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><rect x="4" y="86" width="112" height="6" rx="3" style="fill:var(--bird-line)"/><path style="fill:var(--tomato)" d="M18 50 L2 46 L16 68 Z"/><circle cx="38" cy="62" r="24" style="fill:var(--tomato)"/><path style="fill:var(--bird-line)" d="M59 54 L72 60 L59 66 Z"/><circle cx="46" cy="54" r="6.5" fill="#FFFFFF"/><circle cx="48" cy="54" r="3.2" fill="#0A2E2B"/><path style="fill:var(--agent-2)" d="M100 58 L116 74 L100 78 Z"/><rect x="74" y="22" width="30" height="64" rx="15" style="fill:var(--agent-2)"/><path style="fill:var(--bird-line)" d="M75 34 L63 40 L75 46 Z"/><circle cx="84" cy="38" r="6.5" fill="#FFFFFF"/><circle cx="82" cy="38" r="3.2" fill="#0A2E2B"/><g transform="rotate(-8 57 20)"><rect x="46" y="12" width="22" height="16" rx="2" style="fill:var(--mark-letter)"/><path style="fill:var(--mark-fold)" d="M46 13.5 L57 21 L68 13.5 L68 16 L57 23.5 L46 16 Z"/></g></svg>
+        birdie
+      </a>
+      <div class="links">
+        <a href="#install">Install</a>
+        <a href="https://github.com/koshikraj/birdie"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.77-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>GitHub</a>
+        <a href="https://x.com/rajkoshik"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.6 1h2.3L9.8 6.8 15.8 15h-4.7L7.4 10.100 3.200 15H.9l5.400-6.200L.5 1h4.800l3.300 4.500L12.600 1Zm-.8 12.600h1.300L4.700 2.300H3.300l8.500 11.300Z"/></svg>X</a>
+        <a href="https://github.com/koshikraj/birdie/releases/latest" data-release>Latest release</a>
+      </div>
+    </nav>
+    <div class="hero-copy">
+      <h1>Give your agents a way to talk.</h1>
+      <div class="hero-side">
+        <p class="lede">birdie lets Claude Code, Codex, Hermes, Grok and Grok Bot message each other from your machine. Every message has a verified sender, and every answer returns to the session that asked.</p>
+        <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh</code><button type="button" id="copy-hero" data-copy>Copy</button></div>
+      </div>
+    </div>
+    <div class="stage">
+      <svg id="hero-svg" role="img" aria-label="The app icons of Claude Code, Codex, Hermes and Grok Bot land on a wire and turn into birds. They pass letters along the wire and answer each other, then turn back into icons."></svg>
+      <div class="stage-foot">
+        <p class="caption" id="hero-caption">Four agents, four separate windows.</p>
+        <button type="button" class="ctl" id="hero-ctl">Pause</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="night flow" aria-labelledby="flow-title">
+    <div class="wrap">
+      <div class="flow-head">
+        <h2 id="flow-title">One agent can run the whole feature.</h2>
+        <p class="lede">Claude asks for a design, a review and a deploy, then carries on as each answer lands. A message wakes an idle session, so nobody has to go and fetch the reply.</p>
+      </div>
+      <ol class="miles" aria-label="Feature pipeline">
+        <li data-m="0" data-s="done"><span class="pi"><svg aria-hidden="true"><use href="#i-figma"/></svg></span><span class="pn">Design<small>Figma</small></span></li>
+        <li data-m="1" data-s="done"><span class="pi"><svg aria-hidden="true"><use href="#i-github"/></svg></span><span class="pn">Code<small>GitHub</small></span></li>
+        <li data-m="2" data-s="done"><span class="pi"><svg aria-hidden="true"><use href="#i-codex-mono"/></svg></span><span class="pn">Review<small>Codex</small></span></li>
+        <li data-m="3" data-s="done"><span class="pi"><svg aria-hidden="true"><use href="#i-vercel"/></svg></span><span class="pn">Deploy<small>Vercel</small></span></li>
+      </ol>
+      <div class="flow-grid">
+        <div class="flow-stage">
+          <svg id="flow-svg" viewBox="0 0 640 566" role="img" aria-label="A red bird named claude sits at the center of three wires. Letters travel to grok-bot for design, codex for review and hermes for deploy, and answers travel back."></svg>
+          <div class="flow-foot"><button type="button" class="ctl" id="flow-ctl">Play</button></div>
+        </div>
+        <div class="flow-side">
+          <div class="desk">
+            <div class="tabs" id="tabs" role="group" aria-label="Show an agent's screen"></div>
+            <div class="wins" id="wins" aria-hidden="true"></div>
+          </div>
+          <ol class="sr" id="transcript" aria-label="Example messages"></ol>
+          <p class="note">You choose which agent does what, and each one works with its own tools. birdie carries the messages and checks who sent them. Hermes only wakes on a message if you set it up with <code>birdie setup hermes --wake</code>. Otherwise messages wait for its next turn.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="install wrap" id="install" aria-labelledby="install-title">
+    <h2 id="install-title">One command. Then just ask.</h2>
+    <ol class="steps">
+      <li class="step step-1">
+        <h3><span>1</span>Install</h3>
+        <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh</code><button type="button" id="copy-install" data-copy>Copy</button></div>
+        <p>Linux or macOS. It needs no Go and no sudo. It puts the latest release in <code class="inl">~/.local/bin</code>, verifies the checksum and starts onboarding.</p>
+      </li>
+      <li class="step">
+        <h3><span>2</span>Tick your agents</h3>
+        <ul class="ticks" aria-label="Agents you can connect">
+          <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Claude Code</li>
+          <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Codex</li>
+          <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Grok CLI</li>
+          <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Hermes</li>
+          <li><i></i>Headless Grok</li>
+          <li><i></i>Headless Hermes</li>
+          <li><i></i>Grok Bot</li>
+        </ul>
+        <p>Nothing changes until you confirm. Restart any open sessions afterwards.</p>
+      </li>
+      <li class="step">
+        <h3><span>3</span>Ask in plain words</h3>
+        <div class="chat"><span class="me">Ask Codex to review this PR.</span><span class="them">codex: The toggle resets on reload.</span></div>
+        <p>You don't have to mention birdie. If something looks off, run <code class="inl">birdie doctor</code>.</p>
+      </li>
+    </ol>
+    <p class="fine">On Windows, <a href="https://github.com/koshikraj/birdie/releases/latest">download the binary</a> and run <code>birdie serve</code> yourself. The unrelated Python package <code>birdie-agent</code> also installs a <code>birdie</code> command, so if you have both, put this one first on your PATH. <a href="https://github.com/koshikraj/birdie#readme">Read the full guide</a>.</p>
+  </section>
+</main>
+
+<footer class="close">
+  <div class="wrap">
+    <div class="close-in">
+      <h2>Put your agents on the wire.</h2>
+      <div class="links">
+        <a href="https://github.com/koshikraj/birdie"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.77-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>GitHub</a>
+        <a href="https://x.com/rajkoshik"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.6 1h2.3L9.8 6.8 15.8 15h-4.7L7.4 10.100 3.200 15H.9l5.400-6.200L.5 1h4.800l3.300 4.500L12.600 1Zm-.8 12.600h1.300L4.700 2.300H3.300l8.500 11.300Z"/></svg>@rajkoshik</a>
+        <a href="https://github.com/koshikraj/birdie/releases/latest" data-release>Latest release</a>
+      </div>
+    </div>
+    <p class="close-note">The message bus runs on your machine at 127.0.0.1:7777. It speaks MCP, webhooks and ACP, and keeps messages in SQLite.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var NS = "http://www.w3.org/2000/svg";
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  /* ---------- helpers ---------- */
+  function el(name, attrs, parent, text) {
+    var n = document.createElementNS(NS, name);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function fill(token) { return "fill:var(--" + token + ")"; }
+  function clamp(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function seg(t, a, b) { return clamp((t - a) / (b - a)); }
+  function lerp(a, b, p) { return a + (b - a) * p; }
+  function inOut(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
+  function outCubic(p) { return 1 - Math.pow(1 - p, 3); }
+  function back(p, k) { var c = k || 2.2; return p >= 1 ? 1 : 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); }
+  function bump(t, at, dur) { var p = seg(t, at, at + dur); return p > 0 && p < 1 ? Math.sin(Math.PI * p) : 0; }
+  function hops(t, list, dur, height) { var y = 0; for (var i = 0; i < list.length; i++) y += bump(t, list[i], dur) * height; return y; }
+  function show(n, on) { n.style.display = on ? "" : "none"; }
+
+  /* ---------- bird: one body rect that morphs between an app tile and a bird ---------- */
+  var SPECS = {
+    dot:  { c: 1, w: 64, h: 64, rx: 32, tail: "-28,-48 -50,-56 -30,-20", beak: "30,-42 46,-34 30,-26", eye: [12, -44], wing: [-12, -26, 14, 10, -20] },
+    dash: { c: 2, w: 40, h: 84, rx: 20, tail: "-16,-36 -36,-10 -16,-6", beak: "19,-66 35,-58 19,-50", eye: [6, -62], wing: [-4, -30, 9, 16, 0] },
+    arch: { c: 3, w: 54, h: 70, rx: 27, tail: "-24,-44 -42,-56 -26,-16", beak: "25,-50 40,-42 25,-34", eye: [10, -48], wing: [-8, -26, 11, 14, 8] },
+    box:  { c: 4, w: 62, h: 58, rx: 18, tail: "-28,-36 -46,-48 -30,-12", beak: "29,-38 44,-30 29,-22", eye: [12, -36], wing: [-10, -20, 13, 10, -15] }
+  };
+  var TILE = { w: 68, h: 68, rx: 17 };
+  var CAN_MIX = !!(window.CSS && CSS.supports && CSS.supports("color", "color-mix(in oklab, red 50%, blue)"));
+  function pts(str) { return str.split(" ")[0].split(",").map(Number); }
+
+  // tile: { bg, icon, iconColor, size } or { bg, text, textColor }. Its color blends into the bird's.
+  function makeBird(parent, spec, face, tile) {
+    var c = spec.c, birdFill = "var(--agent-" + c + ")", g = el("g", {}, parent), turn = el("g", { transform: "scale(" + face + " 1)" }, g);
+    var tail = el("polygon", { points: spec.tail, style: fill("agent-" + c) }, turn);
+    var body = el("rect", { style: "fill:" + birdFill }, turn);
+    var wing = el("ellipse", { rx: spec.wing[2], ry: spec.wing[3], style: fill("agent-" + c + "-wing") }, turn);
+    var beak = el("polygon", { points: spec.beak, style: fill("bird-line") }, turn);
+    var eyeW = el("circle", { r: 9, cx: spec.eye[0], cy: spec.eye[1], style: fill("bird-eye") }, turn);
+    var eyeP = el("circle", { r: 4.5, cx: spec.eye[0] + 3, cy: spec.eye[1], style: fill("bird-pupil") }, turn);
+    var eyeS = el("rect", { x: spec.eye[0] - 8, y: spec.eye[1] - 2, width: 16, height: 4, rx: 2, style: fill("bird-eye") }, turn);
+    var glyph = null, lastFill = "";
+    if (tile && tile.icon) {
+      var z = tile.size || 46;
+      glyph = el("use", { href: "#" + tile.icon, x: -z / 2, y: -34 - z / 2, width: z, height: z, style: "color:" + (tile.iconColor || "#000") }, g);
+    } else if (tile && tile.text) {
+      glyph = el("text", { x: 0, y: -25, "text-anchor": "middle", "font-size": 26, "font-weight": 500, style: "font-family:var(--font-mono);fill:" + tile.textColor }, g, tile.text);
+    }
+    var tp = pts(spec.tail), bp = pts(spec.beak);
+    function part(n, ox, oy, s, extra) {
+      show(n, s > 0.01);
+      if (s > 0.01) n.setAttribute("transform", "translate(" + ox + " " + oy + ") scale(" + s + ") translate(" + (-ox) + " " + (-oy) + ")" + (extra || ""));
+    }
+    return {
+      g: g,
+      update: function (o) {
+        var p = o.p, s = o.s || 1, mix = o.color == null ? clamp(p) : o.color;
+        if (o.face != null) turn.setAttribute("transform", "scale(" + o.face + " 1)");
+        var w = Math.max(10, lerp(TILE.w, spec.w, p)), h = Math.max(10, lerp(TILE.h, spec.h, p));
+        var rx = Math.min(Math.max(lerp(TILE.rx, spec.rx, p), 4), w / 2, h / 2);
+        body.setAttribute("x", -w / 2); body.setAttribute("y", -h); body.setAttribute("width", w); body.setAttribute("height", h); body.setAttribute("rx", rx);
+        if (tile) {
+          var f = mix >= 0.995 ? birdFill : mix <= 0.005 ? tile.bg : CAN_MIX ? "color-mix(in oklab, " + birdFill + " " + (mix * 100).toFixed(1) + "%, " + tile.bg + ")" : (mix < 0.5 ? tile.bg : birdFill);
+          if (f !== lastFill) { body.style.fill = f; lastFill = f; }
+        }
+        var parts = clamp((p - 0.45) / 0.55);
+        part(tail, tp[0], tp[1], parts);
+        part(beak, bp[0], bp[1] + 8, parts);
+        part(wing, spec.wing[0], spec.wing[1], parts, spec.wing[4] ? " rotate(" + spec.wing[4] + " " + spec.wing[0] + " " + spec.wing[1] + ")" : "");
+        wing.setAttribute("cx", spec.wing[0]); wing.setAttribute("cy", spec.wing[1]);
+        var eyes = clamp((p - 0.6) / 0.4);
+        var asleep = !!o.asleep && eyes > 0.5;
+        part(eyeW, spec.eye[0], spec.eye[1], asleep ? 0 : eyes);
+        part(eyeP, spec.eye[0] + 3, spec.eye[1], asleep ? 0 : eyes);
+        show(eyeS, asleep);
+        if (glyph) { var gl = 1 - seg(mix, 0.05, 0.5); glyph.setAttribute("opacity", gl); show(glyph, gl > 0.01); }
+        g.setAttribute("transform", "translate(" + o.x + " " + o.y + ") rotate(" + (o.lean || 0) + ") scale(" + s + ")");
+      }
+    };
+  }
+
+  function makeLetter(parent, tone) {
+    var g = el("g", {}, parent);
+    el("rect", { x: -17, y: -12, width: 34, height: 24, rx: 3, style: fill("letter-edge") }, g);
+    el("rect", { x: -15, y: -10, width: 30, height: 20, rx: 1.500, style: fill("letter") }, g);
+    el("path", { d: "M-15 -9 L0 2 L15 -9 L15 -5 L0 6 L-15 -5 Z", style: fill(tone === "reply" ? "fold-reply" : "fold-request") }, g);
+    return g;
+  }
+
+  function makeBubble(parent, text, fs) {
+    var W = text.length * fs * 0.6 + fs * 1.4, H = fs * 2;
+    var g = el("g", {}, parent);
+    var tail = el("polygon", { style: "fill:var(--surface);stroke:var(--bird-line);stroke-width:2.500;stroke-linejoin:round" }, g);
+    el("rect", { x: -W / 2, y: -H - 9, width: W, height: H, rx: 8, style: "fill:var(--surface);stroke:var(--bird-line);stroke-width:2.500" }, g);
+    var patch = el("rect", { y: -11, width: 18, height: 4, style: fill("surface") }, g);
+    el("text", { x: 0, y: -H / 2 - 9 + fs * 0.35, "text-anchor": "middle", "font-size": fs, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, g, text);
+    return {
+      w: W,
+      update: function (cx, by, s, tailX) {
+        show(g, s > 0.01);
+        if (s <= 0.01) return;
+        var off = Math.max(-W / 2 + 16, Math.min(W / 2 - 16, tailX - cx));
+        tail.setAttribute("points", (off - 8) + ",-10 " + off + ",1 " + (off + 8) + ",-10");
+        patch.setAttribute("x", off - 9);
+        g.setAttribute("transform", "translate(" + cx + " " + by + ") scale(" + s + ")");
+      }
+    };
+  }
+
+  /* ---------- hero: icons land on a wire, turn into birds, trade letters, turn back ---------- */
+  var heroSvg = document.getElementById("hero-svg"), heroCaption = document.getElementById("hero-caption");
+  var HERO_T = 17;
+  var CAPTIONS = [
+    [0, "Four agents, four separate windows."],
+    [1.4, "birdie puts them on one wire."],
+    [3.7, "Any agent can message any other."],
+    [7.5, "A message wakes an idle session."],
+    [11.2, "Every answer returns to the session that asked."],
+    [14.6, "Install it once. They stay connected."]
+  ];
+  var HERO_AGENTS = [
+    { label: "claude code", spec: SPECS.dot, face: 1, morph: 1.5, tile: { bg: "#D97757", icon: "i-claudecode", iconColor: "#FFF7F0", size: 50 }, pushes: [4.4, 11.2], hops: [7.3, 12.4] },
+    { label: "codex", spec: SPECS.dash, face: 1, morph: 1.8, tile: { bg: "#FFFFFF", icon: "i-codex", size: 52 }, pushes: [8.1, 11.7], hops: [10.6, 12.9] },
+    { label: "hermes", spec: SPECS.box, face: -1, morph: 2.1, tile: { bg: "#FFFFFF", icon: "i-hermes", size: 58 }, pushes: [6.3, 11.9], hops: [5.4, 12.7] },
+    { label: "grok bot", spec: SPECS.arch, face: -1, morph: 2.4, tile: { bg: "#000000", icon: "i-grok", iconColor: "#FFFFFF", size: 44 }, pushes: [9.8, 11.4], hops: [8.9, 12.2] }
+  ];
+  var HERO_LETTERS = [
+    { a: 0, b: 2, at: 4.4, dur: 1.0, tone: "request" }, { a: 2, b: 0, at: 6.3, dur: 1.0, tone: "reply" },
+    { a: 1, b: 3, at: 8.1, dur: 0.8, tone: "request" }, { a: 3, b: 1, at: 9.8, dur: 0.8, tone: "reply" },
+    { a: 0, b: 3, at: 11.2, dur: 1.0, tone: "request" }, { a: 3, b: 0, at: 11.4, dur: 1.0, tone: "reply" },
+    { a: 1, b: 2, at: 11.7, dur: 1.0, tone: "request" }, { a: 2, b: 1, at: 11.9, dur: 1.0, tone: "reply" }
+  ];
+  var HERO_BUBBLES = [
+    { a: 0, text: "hermes, check my math?", from: 3.7, to: 5.3 }, { a: 2, text: "off by one.", from: 5.6, to: 7.3 },
+    { a: 1, text: "any meetings today?", from: 7.5, to: 9.0 }, { a: 3, text: "free till 3.", from: 9.2, to: 10.8 }
+  ];
+  var WAKE = 8.9, UNMORPH = 14.4, SLEEPER = 3, MORPH_IN = 1.1, MORPH_OUT = 1.0;
+  var heroScene = null;
+
+  function buildHero(narrow) {
+    while (heroSvg.firstChild) heroSvg.removeChild(heroSvg.firstChild);
+    var L = narrow
+      ? { w: 760, h: 410, xs: [100, 290, 480, 670], wire: 320, S: 1.3, fs: 26, lab: 26, labY: 366, letter: 1.35 }
+      : { w: 1160, h: 340, xs: [170, 440, 720, 990], wire: 262, S: 1.25, fs: 20, lab: 20, labY: 300, letter: 1.1 };
+    heroSvg.setAttribute("viewBox", "0 0 " + L.w + " " + L.h);
+    var wire = el("rect", { y: L.wire, height: 6, rx: 3, style: fill("bird-line") }, heroSvg);
+    var agents = HERO_AGENTS.map(function (a, i) {
+      var label = el("text", { x: L.xs[i], y: L.labY, "text-anchor": "middle", "font-size": L.lab, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, heroSvg, a.label);
+      var bits = [];
+      for (var k = 0; k < 7; k++) bits.push(el("circle", { r: 5, style: fill("agent-" + a.spec.c) }, heroSvg));
+      return { a: a, x: L.xs[i], bird: makeBird(heroSvg, a.spec, a.face, a.tile), bits: bits, label: label };
+    });
+    var zs = [0, 1, 2].map(function () { return el("text", { "font-size": L.fs + 6, "font-weight": 800, style: "font-family:var(--font-display);" + fill("ink") }, heroSvg, "z"); });
+    var bubbles = HERO_BUBBLES.map(function (b) { return { b: b, ui: makeBubble(heroSvg, b.text, L.fs) }; });
+    var letters = HERO_LETTERS.map(function (m) {
+      var trail = [0, 1, 2].map(function () { return el("circle", { r: 3.500, style: fill("bird-line") }, heroSvg); });
+      return { m: m, trail: trail, g: makeLetter(heroSvg, m.tone) };
+    });
+    heroScene = { L: L, wire: wire, agents: agents, zs: zs, bubbles: bubbles, letters: letters };
+    return heroScene;
+  }
+
+  function letterPos(L, x1, x2, e) {
+    var H = 62 + Math.abs(x2 - x1) * 0.1;
+    return { x: lerp(x1, x2, e), y: L.wire - 96 * L.S - Math.sin(Math.PI * e) * H };
+  }
+
+  function renderHero(t) {
+    var sc = heroScene, L = sc.L;
+    // The wire draws out from the middle and reaches past both page edges.
+    var draw = inOut(seg(t, 0.8, 1.4)) * (1 - inOut(seg(t, 16.1, 16.6)));
+    var half = draw * 3200;
+    sc.wire.setAttribute("x", L.w / 2 - half); sc.wire.setAttribute("width", half * 2);
+    show(sc.wire, draw > 0.001);
+
+    sc.agents.forEach(function (ag, i) {
+      var a = ag.a;
+      // Shape and color change together: the logo fades as the tile takes on the bird's color.
+      var outAt = UNMORPH + i * 0.2;
+      var qIn = seg(t, a.morph, a.morph + MORPH_IN);
+      var color = t < UNMORPH ? inOut(qIn) : 1 - inOut(seg(t, outAt, outAt + MORPH_OUT));
+      var p = t < UNMORPH ? color + Math.sin(Math.PI * seg(qIn, 0.55, 1)) * 0.07 : color; // a small settle at the end
+      // Before the wire arrives, and after it goes, the tiles float on their own.
+      var land = inOut(seg(t, 1.2, 1.5)) * (1 - inOut(seg(t, 16.0, 16.4)));
+      var floaty = (1 - land) * (22 + Math.sin(t * 2 + i * 1.7) * 6);
+      var y = L.wire - floaty - hops(t, a.hops, 0.42, 30) - hops(t, [a.morph + 0.1], 0.6, 22);
+      var face = a.face;
+      if (a.turn) face = a.face * (1 - 2 * (inOut(seg(t, a.turn[0], a.turn[0] + 0.3)) - inOut(seg(t, a.turn[1], a.turn[1] + 0.3))));
+      var lean = 0;
+      a.pushes.forEach(function (at) { lean += bump(t, at - 0.12, 0.5) * 16 * face; });
+      var asleep = i === SLEEPER && t < WAKE;
+      ag.bird.update({ x: ag.x, y: y, p: p, s: L.S, lean: lean, asleep: asleep, face: face, color: color });
+      // Feather pop on each change.
+      ag.bits.forEach(function (n) { show(n, false); });
+      [a.morph + 0.45, outAt + 0.45].forEach(function (b) {
+        var q = seg(t, b, b + 0.6);
+        if (q > 0 && q < 1) ag.bits.forEach(function (n, k) {
+          var ang = k / 7 * Math.PI * 2 + i, d = outCubic(q) * 74 * L.S;
+          show(n, true);
+          n.setAttribute("cx", ag.x + Math.cos(ang) * d);
+          n.setAttribute("cy", L.wire - 42 * L.S + Math.sin(ang) * d + q * q * 26);
+          n.setAttribute("r", 6 * (1 - q) + 0.5);
+          n.setAttribute("opacity", 1 - q);
+        });
+      });
+    });
+
+    // z z z over the sleeping agent, until the letter lands.
+    var sleeper = sc.agents[SLEEPER];
+    sc.zs.forEach(function (z, k) {
+      var on = t > sleeper.a.morph + 0.5 && t < WAKE;
+      show(z, on);
+      if (!on) return;
+      var q = ((t * 0.55 + k / 3) % 1);
+      z.setAttribute("x", sleeper.x + 26 * L.S * sleeper.a.face + (k - 1) * 3 + q * -22);
+      z.setAttribute("y", L.wire - 62 * L.S - q * 44);
+      z.setAttribute("opacity", Math.sin(Math.PI * q));
+    });
+
+    sc.bubbles.forEach(function (bb) {
+      var b = bb.b, ag = sc.agents[b.a];
+      var s = back(seg(t, b.from, b.from + 0.28)) * (1 - seg(t, b.to - 0.2, b.to));
+      var cx = Math.max(bb.ui.w / 2 + 8, Math.min(L.w - bb.ui.w / 2 - 8, ag.x));
+      bb.ui.update(cx, L.wire - (b.a === 1 ? 92 : 78) * L.S - 12, s, ag.x);
+    });
+
+    sc.letters.forEach(function (lt) {
+      var m = lt.m, q = (t - m.at) / m.dur, on = q > 0 && q < 1;
+      show(lt.g, on); lt.trail.forEach(function (n) { show(n, on); });
+      if (!on) return;
+      var x1 = L.xs[m.a], x2 = L.xs[m.b], e = inOut(q), pos = letterPos(L, x1, x2, e);
+      var dir = x2 > x1 ? 1 : -1;
+      lt.g.setAttribute("transform", "translate(" + pos.x + " " + pos.y + ") rotate(" + (Math.cos(Math.PI * e) * -14 * dir) + ") scale(" + L.letter + ")");
+      lt.trail.forEach(function (n, k) {
+        var e2 = Math.max(0, e - (k + 1) * 0.05), p2 = letterPos(L, x1, x2, e2);
+        n.setAttribute("cx", p2.x); n.setAttribute("cy", p2.y); n.setAttribute("opacity", e2 > 0 ? 0.5 - k * 0.14 : 0);
+      });
+    });
+
+    var cap = CAPTIONS[0][1];
+    CAPTIONS.forEach(function (c) { if (t >= c[0]) cap = c[1]; });
+    if (heroCaption.textContent !== cap) heroCaption.textContent = cap;
+  }
+
+  /* ---------- flow: one coordinator, three colleagues ---------- */
+  var flowSvg = document.getElementById("flow-svg");
+  var STEPS = [
+    { at: 1.9, from: "you", to: "claude", text: "Add dark mode to settings and ship it." },
+    { at: 4.0, from: "claude", to: "grok-bot", text: "We need a dark palette for settings. Any ideas?" },
+    { at: 9.6, from: "grok-bot", to: "claude", text: "Three options in Figma. I'd pick the middle one." },
+    { at: 14.6, from: "claude", to: "codex", text: "The PR is up on GitHub. Can you review it?" },
+    { at: 19.2, from: "codex", to: "claude", text: "The toggle resets on reload. One fix needed." },
+    { at: 22.7, from: "claude", to: "codex", text: "Fixed. Another look?" },
+    { at: 26.0, from: "codex", to: "claude", text: "Looks good. Approved." },
+    { at: 28.1, from: "claude", to: "hermes", text: "Approved. Please deploy it to Vercel." },
+    { at: 33.0, from: "hermes", to: "claude", text: "It's live on Vercel and the smoke tests pass." },
+    { at: 34.6, from: "claude", to: "you", text: "Dark mode is live, reviewed and tested." }
+  ];
+  STEPS.end = 35.6;
+  var FLOW_HOLD = 5, FLOW_T = STEPS.end + FLOW_HOLD;
+  var miles = Array.prototype.slice.call(document.querySelectorAll(".miles li"));
+  var MILE_T = [[STEPS[1].at, STEPS[2].at + 1], [STEPS[2].at + 1, STEPS[3].at], [STEPS[3].at, STEPS[6].at + 1], [STEPS[7].at, STEPS[8].at + 1]];
+
+  STEPS.forEach(function (st) {
+    var li = document.createElement("li");
+    li.textContent = st.from + " to " + st.to + ": " + st.text;
+    document.getElementById("transcript").appendChild(li);
+  });
+
+  /* ---------- the agents' screens ---------- */
+  var ACTIVE = [[0, "claude"], [5.0, "grokbot"], [10.6, "claude"], [15.6, "codex"], [20.2, "claude"], [23.7, "codex"], [27.0, "claude"], [29.1, "hermes"], [34.0, "claude"]];
+  var SPIN_CLAUDE = ["✻", "✽", "✶", "✢"], SPIN_HERMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  var STREAM_CPS = 70, TYPE_CPS = 26;
+  function esc(x) { return x.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+  function callJson(to, text, tail) { return '<span class="blt-on">•</span> <b>Called</b> <span class="fn">birdie</span>.send_message({"to":"' + to + '","content":"' + esc(text) + '"})<span class="out">└ {"message_id":"msg_' + tail + '","status":"queued","thread_id":"thr_' + tail + '"}</span>'; }
+  function fromClaude(t) { return { at: t.at, cls: "band", html: '<span class="dim">›</span> Message from claude: ' + esc(t.text) }; }
+  function claudeSpin(from, to, verb) {
+    return { at: from, until: to, cls: "spin", dyn: function (t) {
+      var sec = Math.max(1, Math.ceil(t - from));
+      return SPIN_CLAUDE[Math.floor(t * 6) % 4] + " " + verb + '… <span class="dim">(' + sec + "s · ↓ " + (sec * 310) + " tokens)</span>";
+    } };
+  }
+  function codexWork(from, to) {
+    return { at: from, until: to, dyn: function (t) { return '<span class="blt-on">•</span> <span class="sh">Working</span> <span class="dim">(' + Math.max(1, Math.ceil(t - from)) + "s • <b>esc</b> to interrupt)</span>"; } };
+  }
+  function chatAct(from, to, text) { return { at: from, until: to, raw: '<div class="act"><span class="eyes"><i></i><i></i></span><span class="sh">' + text + "</span></div>" }; }
+  function bub(at, text, me) { return { at: at, raw: '<div class="bub' + (me ? " me" : "") + '">' + text + "</div>" }; }
+  function rep(at, who, text) { return { at: at, cls: "msgin", html: '<span>←</span><span><b>' + who + '</b> <span class="dim">(verified)</span> ' + esc(text) + "</span>" }; }
+  function say(at, text, pre) { return { at: at, stream: text, pre: pre == null ? "● " : pre }; }
+  var CALLED = '<span class="dim">Called birdie (ctrl+o to expand)</span>';
+
+  var WINS = {
+    claude: { name: "claude code", icon: "i-claudecode", iconColor: "#D97757", lines: [
+      { at: 0, raw: '<div class="ln banner"><svg aria-hidden="true"><use href="#i-claudecode"/></svg><b>Claude Code</b><span class="dim">Opus 5.5</span><span class="dim">~/app</span></div>' },
+      { at: 1.9, cls: "band", html: '<span class="prompt">❯</span> ' + esc(STEPS[0].text) },
+      claudeSpin(2.2, 3.4, "Planning"),
+      say(3.4, "I'll get a palette from Grok Bot first."),
+      { at: 3.95, cls: "tool", html: CALLED },
+      rep(10.6, "grok-bot", STEPS[2].text),
+      say(11.2, "Going with the middle one. Writing the code now."),
+      claudeSpin(11.8, 14.0, "Garnishing"),
+      say(14.0, "The PR is up on GitHub. Asking Codex to review it."),
+      { at: 14.55, cls: "tool", html: CALLED },
+      rep(20.2, "codex", STEPS[4].text),
+      claudeSpin(20.8, 22.2, "Fixing"),
+      say(22.2, "Fixed and pushed. Asking Codex for another look."),
+      { at: 22.65, cls: "tool", html: CALLED },
+      rep(27.0, "codex", STEPS[6].text),
+      say(27.5, "Approved. Asking Hermes to deploy it to Vercel."),
+      { at: 28.05, cls: "tool", html: CALLED },
+      rep(34.0, "hermes", STEPS[8].text),
+      say(34.6, STEPS[9].text),
+      { at: 35.3, cls: "dim", html: "✻ Worked for 33s" }
+    ], comp: function (w) {
+      w.c = document.createElement("div"); w.c.className = "comp-claude";
+      w.c.innerHTML = '<div class="box"><span class="prompt dim">❯</span> <span class="ty"></span><i class="cur"></i></div><div class="auto">▸▸ auto mode on <span class="dim">(shift+tab to cycle)<span class="busy"> · esc to interrupt</span></span></div>';
+    } },
+    grokbot: { name: "grok bot", icon: "i-grok", iconColor: "#000000", chat: true, lines: [
+      { at: 0, raw: '<div class="when">Today 9:41 AM</div>' },
+      bub(0, "morning", true),
+      bub(0, "Morning! Anything I can do for you?"),
+      chatAct(5.0, 6.0, "Reading Claude's message"),
+      bub(6.0, "Claude just asked for a dark palette for settings. I'm on it."),
+      chatAct(6.4, 8.6, "Looking through Figma"),
+      bub(8.6, STEPS[2].text),
+      chatAct(9.0, 9.9, "Sending it to Claude"),
+      bub(9.9, "Sent. Claude has it.")
+    ], comp: function (w) {
+      w.c = document.createElement("div"); w.c.className = "chatbox";
+      w.c.innerHTML = '<i class="ci">+</i><span>Message Grok Bot</span><i class="ci">•</i><i class="ci wave">|||</i>';
+    } },
+    codex: { name: "codex", icon: "i-codex", lines: [
+      { at: 0, raw: '<div class="ln"><div class="box"><b>&gt;_ OpenAI Codex</b><br><span class="dim">model:</span> GPT-6-Astra medium<br><span class="dim">directory:</span> ~/app</div></div>' },
+      fromClaude(STEPS[3]),
+      codexWork(16.0, 18.6),
+      { at: 16.7, html: '<span class="blt">•</span> <b>Ran</b> gh pr diff<span class="out">└ 4 files changed, 86 insertions(+), 12 deletions(-)</span>' },
+      say(18.6, "The toggle resets on reload. One fix needed.", "• "),
+      { at: 19.1, html: callJson("claude", "The toggle resets on reload. One fix needed.", "7c1e4a") },
+      { at: 19.7, cls: "dim", html: "Worked for 4s" },
+      fromClaude(STEPS[5]),
+      codexWork(24.0, 25.4),
+      { at: 24.5, html: '<span class="blt">•</span> <b>Ran</b> gh pr diff<span class="out">└ 1 file changed, 3 insertions(+)</span>' },
+      say(25.4, "Looks good. Approved.", "• "),
+      { at: 25.85, html: callJson("claude", "Looks good. Approved.", "92bd07") },
+      { at: 26.4, cls: "dim", html: "Worked for 2s" }
+    ], comp: function (w) {
+      w.c = document.createElement("div"); w.c.className = "comp-codex";
+      w.c.innerHTML = '<div class="input"><span class="dim">›</span> <i class="cur"></i><span class="ph">Ask Codex to do anything</span></div><div class="meta">GPT-6-Astra medium · ~/app</div>';
+    } },
+    hermes: { name: "hermes", icon: "i-hermes", lines: [
+      { at: 0, raw: '<div class="ln"><div class="box"><span class="gold">☤ Hermes Agent</span><br><span class="dim">gpt-5-mini · ~/app</span></div></div>' },
+      { at: 29.1, raw: '<div class="ln"><span class="bar"></span><span class="acc">❯</span> Message from claude: ' + esc(STEPS[7].text) + "</div>" },
+      { at: 29.7, cls: "dim", html: "∴ Thought for 1s · Planning the deploy" },
+      { at: 30.2, html: "📖 Read vercel.json" },
+      { at: 30.9, html: '<span style="color:var(--t-green)">✓</span> $ vercel deploy <span class="dim">0.7s</span>' },
+      { at: 31.6, html: '<span style="color:var(--t-green)">✓</span> $ npm run test:smoke <span class="dim">0.6s</span>' },
+      { at: 32.2, raw: '<div class="ln"><span class="bar"></span><span class="gold">☤ Hermes</span></div>' },
+      say(32.3, STEPS[8].text, ""),
+      { at: 32.9, html: "🔧 birdie_send_message <span class=\"dim\">0.1s</span>" },
+      { at: 33.4, cls: "dim", html: "─ 4.3s · ran 2 commands · read 1 file" }
+    ], comp: function (w) {
+      w.c = document.createElement("div"); w.c.className = "comp-hermes";
+      w.c.innerHTML = '<div class="rule"><span class="act2"><b></b></span></div><div class="input"><span class="acc">❯</span> <i class="cur"></i><span class="dim ph">type to redirect this turn</span></div><div class="low"></div><div class="meta">gpt-5-mini · ctx [░░░░░░░░] 4% · ~/app</div>';
+    } }
+  };
+
+  function buildDesk() {
+    var tabsEl = document.getElementById("tabs"), winsEl = document.getElementById("wins");
+    Object.keys(WINS).forEach(function (k) {
+      var w = WINS[k];
+      var tab = document.createElement("button");
+      tab.type = "button"; tab.className = "tab"; tab.setAttribute("data-w", k); tab.id = "tab-" + k;
+      tab.innerHTML = '<i><svg aria-hidden="true" style="color:' + (w.iconColor || "#000") + '"><use href="#' + w.icon + '"/></svg></i><span class="nm">' + w.name + "</span>";
+      tab.setAttribute("aria-label", "Show " + w.name);
+      tabsEl.appendChild(tab); w.tab = tab;
+      var el = document.createElement("div"); el.className = "win w-" + k + (w.chat ? "" : " term");
+      var scr = document.createElement("div"); scr.className = "scr"; el.appendChild(scr);
+      var col = document.createElement("div"); col.className = "col"; scr.appendChild(col);
+      w.lines.forEach(function (ln) {
+        var holder = document.createElement("div");
+        if (ln.raw) { holder.innerHTML = ln.raw; ln.el = holder.firstChild; }
+        else {
+          holder.className = "ln" + (ln.cls ? " " + ln.cls : "");
+          if (ln.html) holder.innerHTML = ln.html;
+          if (ln.stream != null) {
+            holder.appendChild(document.createTextNode(ln.pre));
+            ln.t = document.createElement("span"); ln.t.textContent = ln.stream; holder.appendChild(ln.t);
+            ln.r = document.createElement("span"); ln.r.className = "r"; holder.appendChild(ln.r);
+            ln.shown = ln.stream.length;
+          }
+          ln.el = holder;
+        }
+        col.appendChild(ln.el);
+      });
+      w.comp(w); el.appendChild(w.c);
+      winsEl.appendChild(el); w.el = el;
+      tab.addEventListener("click", function () { desk.pin = k; desk.pinFrom = desk.active; desk.draw(); });
+    });
+    var claude = WINS.claude.c;
+    desk.typed = claude.querySelector(".ty"); desk.busy = claude.querySelector(".busy");
+    desk.rule = WINS.hermes.c.querySelector(".act2 b");
+  }
+  var desk = { pin: null, pinFrom: null, active: "claude", shown: null, draw: function () {
+    var want = desk.pin || desk.active;
+    if (want === desk.shown) return;
+    desk.shown = want;
+    Object.keys(WINS).forEach(function (k) {
+      WINS[k].el.classList.toggle("on", k === want);
+      WINS[k].tab.setAttribute("aria-pressed", k === want ? "true" : "false");
+    });
+  } };
+  buildDesk();
+  var CLAUDE_PROMPT = STEPS[0].text, BUSY = [[1.9, 3.95], [10.6, 14.55], [20.2, 22.65], [27.0, 28.05], [34.0, 35.3]];
+  function renderDesk(t) {
+    var a = "claude";
+    ACTIVE.forEach(function (x) { if (t >= x[0]) a = x[1]; });
+    if (a !== desk.active) { desk.active = a; if (desk.pin && desk.pin !== desk.pinFrom) desk.pin = null; }
+    if (desk.pin && a !== desk.pinFrom) desk.pin = null;
+    desk.draw();
+    Object.keys(WINS).forEach(function (k) {
+      WINS[k].lines.forEach(function (ln) {
+        var on = t >= ln.at && (ln.until == null || t < ln.until);
+        if (ln.on !== on) { ln.on = on; ln.el.hidden = !on; }
+        if (!on) return;
+        if (ln.dyn) { var h = ln.dyn(t); if (h !== ln.last) { ln.last = h; ln.el.innerHTML = h; } }
+        if (ln.stream != null) {
+          var n = Math.min(ln.stream.length, Math.floor((t - ln.at) * STREAM_CPS));
+          if (n !== ln.shown) { ln.shown = n; ln.t.textContent = ln.stream.slice(0, n); ln.r.textContent = ln.stream.slice(n); }
+        }
+      });
+    });
+    // What you type into Claude Code, then its status line.
+    var typed = t >= 0.4 && t < 1.9 ? CLAUDE_PROMPT.slice(0, Math.floor((t - 0.4) * TYPE_CPS)) : "";
+    if (desk.typed.textContent !== typed) desk.typed.textContent = typed;
+    var busy = BUSY.some(function (b) { return t >= b[0] && t < b[1]; });
+    if (busy !== desk.isBusy) { desk.isBusy = busy; desk.busy.hidden = !busy; }
+    var hBusy = t >= 29.3 && t < 32.9;
+    var rule = hBusy ? SPIN_HERMES[Math.floor(t * 10) % 10] + " Deploying · " + Math.max(1, Math.ceil(t - 29.3)) + "s" : "";
+    if (rule !== desk.lastRule) { desk.lastRule = rule; desk.rule.textContent = rule; }
+  }
+
+  var flow = (function () {
+    var svg = flowSvg, F = { x: 130, y: 322 };
+    var NODES = {
+      "grok-bot": { x: 510, y: 132, spec: SPECS.arch, role: "design", path: "M205 324 C 300 324 300 134 440 134" },
+      "codex": { x: 510, y: 310, spec: SPECS.dash, role: "review", path: "M205 324 Q 320 376 440 312" },
+      "hermes": { x: 510, y: 480, spec: SPECS.box, role: "deploy", path: "M205 324 C 300 324 300 482 440 482" },
+      "you": { path: "M130 120 L130 214" }
+    };
+    var wires = {};
+    Object.keys(NODES).forEach(function (k) {
+      var n = NODES[k];
+      var base = el("path", { d: n.path, fill: "none", "stroke-linecap": "round", style: "stroke:var(--bird-line);stroke-width:5" + (k === "you" ? ";stroke-dasharray:1 11" : "") }, svg);
+      var lit = el("path", { d: n.path, fill: "none", "stroke-linecap": "round", style: "stroke:var(--tomato);stroke-width:5" }, svg);
+      var len = base.getTotalLength();
+      lit.setAttribute("stroke-dasharray", len + " " + len);
+      wires[k] = { base: base, lit: lit, len: len };
+    });
+    // Perches, names.
+    el("rect", { x: F.x - 75, y: F.y, width: 150, height: 5, rx: 2.500, style: fill("bird-line") }, svg);
+    el("text", { x: F.x, y: F.y + 36, "text-anchor": "middle", "font-size": 24, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, svg, "claude");
+    el("text", { x: F.x, y: F.y + 62, "text-anchor": "middle", "font-size": 19, style: "font-family:var(--font-mono);" + fill("ink-muted") }, svg, "coordinator");
+    var birds = {};
+    ["grok-bot", "codex", "hermes"].forEach(function (k) {
+      var n = NODES[k];
+      el("rect", { x: n.x - 70, y: n.y, width: 140, height: 5, rx: 2.500, style: fill("bird-line") }, svg);
+      el("text", { x: n.x, y: n.y + 32, "text-anchor": "middle", "font-size": 21, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, svg, k + " · " + n.role);
+      birds[k] = makeBird(svg, n.spec, -1);
+    });
+    var coord = makeBird(svg, SPECS.dot, 1);
+    var you = makeBird(svg, SPECS.dot, 1, { bg: "var(--action)", text: ">_", textColor: "var(--on-action)" });
+    el("text", { x: 182, y: 92, "font-size": 24, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, svg, "you");
+    you.update({ x: 130, y: 116, p: 0, s: 0.85 });
+
+    // Result badges under each colleague.
+    function tag(x, y, text, color, on) {
+      var w = text.length * 12 + 26 + (text === "live" ? 28 : 0), g = el("g", {}, svg);
+      el("rect", { x: x - w / 2, y: y, width: w, height: 30, rx: 4, style: fill(color) }, g);
+      el("text", { x: x + (text === "live" ? 12 : 0), y: y + 21, "text-anchor": "middle", "font-size": 20, "font-weight": 500, style: "font-family:var(--font-mono);" + fill(on) }, g, text);
+      return g;
+    }
+    var swatches = el("g", {}, svg);
+    [["brand-ink", 0], ["brand-teal-bright", 1], ["brand-butter", 2]].forEach(function (s) {
+      el("rect", { x: 510 - 54 + s[1] * 38, y: 132 + 46, width: 32, height: 28, rx: 3, style: fill(s[0]) + ";stroke:var(--bird-line);stroke-width:" + (s[1] === 1 ? 3 : 1.500) }, swatches);
+    });
+    var bug = tag(510, 310 + 46, "1 bug", "tomato", "brand-ink");
+    var ok = tag(510, 310 + 46, "approved", "brand-teal-bright", "brand-ink");
+    var live = tag(510, 480 + 46, "live", "brand-teal-bright", "brand-ink");
+    el("use", { href: "#i-vercel", x: 510 - 46, y: 480 + 52, width: 18, height: 18, style: "color:var(--brand-ink)" }, live);
+    var buildBubble = makeBubble(svg, "building...", 21), fixBubble = makeBubble(svg, "fixing...", 21);
+
+    var zs = {};
+    Object.keys(birds).forEach(function (k) {
+      zs[k] = [0, 1].map(function () { return el("text", { "font-size": 24, "font-weight": 800, style: "font-family:var(--font-display);" + fill("ink") }, svg, "z"); });
+    });
+
+    var letters = STEPS.map(function (st) { return makeLetter(svg, st.from === "claude" || st.from === "you" ? "request" : "reply"); });
+
+    // A colleague is awake from when a request lands until just after it answers.
+    var windows = { "grok-bot": [], "codex": [], "hermes": [] };
+    STEPS.forEach(function (st, i) {
+      if (windows[st.to] && STEPS[i + 1]) windows[st.to].push([st.at + 1, STEPS[i + 1].at + 1.2]);
+    });
+
+    function pop(n, t, from, to) {
+      var on = t >= from && t < to;
+      show(n, on);
+      if (!on) return;
+      var s = back(seg(t, from, from + 0.3));
+      var box = n.getBBox(), cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+      n.setAttribute("transform", "translate(" + cx + " " + cy + ") scale(" + s + ") translate(" + (-cx) + " " + (-cy) + ")");
+    }
+
+    return function render(t) {
+      var finished = t >= STEPS.end;
+      // Coordinator.
+      var hopsC = [], pushesC = [];
+      STEPS.forEach(function (st) { if (st.to === "claude") hopsC.push(st.at + 1); if (st.from === "claude") pushesC.push(st.at); });
+      var lean = 0;
+      pushesC.forEach(function (at) { lean += bump(t, at - 0.12, 0.5) * 12; });
+      var busyBuild = t >= STEPS[2].at + 1.1 && t < STEPS[3].at - 0.1;
+      var busyFix = t >= STEPS[4].at + 1.1 && t < STEPS[5].at - 0.1;
+      var bob = (busyBuild || busyFix) ? Math.abs(Math.sin(t * 9)) * 5 : 0;
+      coord.update({ x: F.x, y: F.y - hops(t, hopsC, 0.42, 30) - bob - hops(t, [STEPS.end], 0.5, 34), p: 1, s: 1.55, lean: lean });
+      buildBubble.update(255, 196, busyBuild ? back(seg(t, STEPS[2].at + 1.1, STEPS[2].at + 1.4)) : 0, 180);
+      fixBubble.update(245, 196, busyFix ? back(seg(t, STEPS[4].at + 1.1, STEPS[4].at + 1.4)) : 0, 180);
+
+      Object.keys(birds).forEach(function (k) {
+        var n = NODES[k], awake = finished;
+        windows[k].forEach(function (w) { if (t >= w[0] && t < w[1]) awake = true; });
+        var h = [];
+        STEPS.forEach(function (st) { if (st.to === k) h.push(st.at + 1); });
+        h.push(STEPS.end);
+        var l = 0;
+        STEPS.forEach(function (st) { if (st.from === k) l += bump(t, st.at - 0.12, 0.5) * -12; });
+        birds[k].update({ x: n.x, y: n.y - hops(t, h, 0.42, 26), p: 1, s: 1.15, lean: l, asleep: !awake });
+        zs[k].forEach(function (z, i) {
+          show(z, !awake);
+          if (awake) return;
+          var q = (t * 0.5 + i / 2) % 1;
+          z.setAttribute("x", n.x + 40 + q * 14 + i * 3);
+          z.setAttribute("y", n.y - 58 - q * 30);
+          z.setAttribute("opacity", Math.sin(Math.PI * q));
+        });
+      });
+
+      Object.keys(wires).forEach(function (k) { show(wires[k].lit, false); });
+      STEPS.forEach(function (st, i) {
+        var q = (t - st.at) / 1, on = q > 0 && q < 1;
+        show(letters[i], on);
+        if (!on) return;
+        var outward = st.from === "claude";
+        var key = st.from === "you" || st.to === "you" ? "you" : (outward ? st.to : st.from);
+        var w = wires[key], e = inOut(q);
+        var forward = key === "you" ? st.from === "you" : outward;
+        var at = (forward ? e : 1 - e) * w.len;
+        var pt = w.base.getPointAtLength(at);
+        letters[i].setAttribute("transform", "translate(" + pt.x + " " + (pt.y - 18) + ") scale(1.150)");
+        show(w.lit, true);
+        if (forward) { w.lit.setAttribute("stroke-dashoffset", w.len - at); }
+        else { w.lit.setAttribute("stroke-dashoffset", -at); }
+      });
+
+      pop(swatches, t, STEPS[2].at + 0.2, Infinity);
+      pop(bug, t, STEPS[4].at + 0.2, STEPS[6].at + 0.2);
+      pop(ok, t, STEPS[6].at + 0.2, Infinity);
+      pop(live, t, STEPS[8].at + 0.2, Infinity);
+
+      // The agent's screen and the pipeline follow along.
+      renderDesk(t);
+      miles.forEach(function (m, i) {
+        var w = MILE_T[i], s = t >= w[1] ? "done" : t >= w[0] ? "active" : "todo";
+        if (m.getAttribute("data-s") !== s) m.setAttribute("data-s", s);
+      });
+    };
+  })();
+
+  /* ---------- playback ---------- */
+  function Player(o) {
+    var self = this, time = o.start, playing = o.autoplay, visible = false, raf = 0, last = 0, entered = false;
+    function label() { o.button.textContent = playing ? "Pause" : "Play"; }
+    function frame(now) {
+      raf = 0;
+      if (!playing || !visible) return;
+      var dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
+      last = now;
+      time = (time + dt) % o.T;
+      o.render(time);
+      raf = requestAnimationFrame(frame);
+    }
+    function kick() { if (playing && visible && !raf) { last = 0; raf = requestAnimationFrame(frame); } }
+    o.button.addEventListener("click", function () {
+      playing = !playing;
+      if (playing && o.restartFromRest && !entered) { entered = true; time = 0; }
+      label(); kick();
+    });
+    new IntersectionObserver(function (es) {
+      visible = es[es.length - 1].isIntersecting;
+      if (visible && playing && o.restartFromRest && !entered) { entered = true; time = 0; }
+      kick();
+    }, { threshold: 0.2 }).observe(o.watch);
+    self.setPlaying = function (v, still) { playing = v; if (!v && still != null) { time = still; o.render(still); } label(); kick(); };
+    self.redraw = function () { o.render(time); };
+    label();
+    o.render(time);
+  }
+
+  var narrowMq = window.matchMedia("(max-width: 640px)");
+  buildHero(narrowMq.matches);
+  var HERO_STILL = 4.9, isReduced = reduced.matches;
+  var heroPlayer = new Player({ render: renderHero, T: HERO_T, start: isReduced ? HERO_STILL : 0, autoplay: !isReduced, button: document.getElementById("hero-ctl"), watch: heroSvg });
+  var flowPlayer = new Player({ render: flow, T: FLOW_T, start: FLOW_T - 0.01, autoplay: !isReduced, restartFromRest: true, button: document.getElementById("flow-ctl"), watch: flowSvg });
+  narrowMq.addEventListener("change", function () { buildHero(narrowMq.matches); heroPlayer.redraw(); });
+  reduced.addEventListener("change", function () {
+    heroPlayer.setPlaying(!reduced.matches, HERO_STILL);
+    flowPlayer.setPlaying(!reduced.matches, FLOW_T - 0.01);
+  });
+
+  /* ---------- release label: ask GitHub, and keep "Latest release" if that fails ---------- */
+  if (window.fetch) {
+    fetch("https://api.github.com/repos/koshikraj/birdie/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !/^v?\d+\.\d+\.\d+[0-9A-Za-z.+-]*$/.test(d.tag_name || "")) return;
+        Array.prototype.forEach.call(document.querySelectorAll("[data-release]"), function (a) { a.textContent = "Release " + d.tag_name; });
+      })
+      .catch(function () {});
+  }
+
+  /* ---------- copy buttons ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (btn) {
+    btn.addEventListener("click", function () {
+      var code = btn.parentNode.querySelector("code");
+      function done(msg) { btn.textContent = msg; setTimeout(function () { btn.textContent = "Copy"; }, 1600); }
+      function selectIt() {
+        var r = document.createRange(); r.selectNodeContents(code);
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        done("Selected");
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code.textContent).then(function () { done("Copied"); }, selectIt);
+      } else { selectIt(); }
+    });
+  });
+})();
+</script>
+</body>
+</html>
