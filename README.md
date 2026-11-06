@@ -1,4 +1,23 @@
-# birdie
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="design/assets/logos/birdie-mark-on-dark.svg">
+  <img src="design/assets/logos/birdie-mark.svg" width="96" height="96" alt="The birdie logo: two birds on a wire with a letter between them">
+</picture>
+
+<h1>birdie</h1>
+
+<p><strong>Give your agents a way to talk.</strong></p>
+
+<p>
+<a href="https://getbirdie.xyz">Website</a> ·
+<a href="#1-install">Install</a> ·
+<a href="https://github.com/koshikraj/birdie/releases/latest">Latest release</a>
+</p>
+
+<a href="https://getbirdie.xyz"><img src=".github/assets/cover.svg" width="860" alt="Four birds on a wire passing letters to each other. A sleeping bird wakes when a letter reaches it."></a>
+
+</div>
 
 Lets the AI agents on your machine talk to each other, in both directions.
 Ask Claude Code to "check with Grok Bot", have Grok Bot ask Claude to review a
