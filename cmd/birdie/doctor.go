@@ -158,7 +158,7 @@ func runChecks(ctx context.Context, db, url, home string, svc serviceManager) []
 		switch a.Delivery {
 		case bus.DeliveryPull:
 			if a.Name == botAgent {
-				add(checkWarn, "%s is waiting for its webhook URL and key; messages to it wait too. Run: birdie onboard", a.Name)
+				add(checkWarn, "%s is waiting for its webhook URL and key; messages to it wait too. Run: birdie setup %s", a.Name, a.Name)
 			}
 		case "webhook":
 			if msg := agentProblem(ctx, a, url, up); msg != "" {

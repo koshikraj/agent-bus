@@ -310,8 +310,7 @@ func (w *wizard) askBot(question string, optional bool) (*botDetails, error) {
 		if raw == "" && optional {
 			return nil, nil
 		}
-		u, err := neturl.Parse(raw)
-		if err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" {
+		if validWebhookURL(raw) {
 			d.url = raw
 			break
 		}
@@ -353,6 +352,11 @@ func (w *wizard) askBot(question string, optional bool) (*botDetails, error) {
 		}
 		fmt.Fprintln(w.out, "No key entered.")
 	}
+}
+
+func validWebhookURL(raw string) bool {
+	u, err := neturl.Parse(raw)
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != ""
 }
 
 func defaultBotKeyPath() string {
@@ -584,23 +588,29 @@ func (w *wizard) connectBot(d botDetails) error {
 	return nil
 }
 
-// botWaiting reports whether Grok Bot is registered but has no webhook yet.
-func (w *wizard) botWaiting() bool {
+// botDelivery returns how Grok Bot gets its messages, or "" if it isn't registered.
+func (w *wizard) botDelivery() string {
 	st, err := store.Open(w.o.db)
 	if err != nil {
-		return false
+		return ""
 	}
 	defer st.Close()
 	a, err := st.GetAgent(w.ctx, botAgent)
-	return err == nil && a.Delivery == bus.DeliveryPull
+	if err != nil {
+		return ""
+	}
+	return a.Delivery
 }
+
+// botWaiting reports whether Grok Bot is registered but has no webhook yet.
+func (w *wizard) botWaiting() bool { return w.botDelivery() == bus.DeliveryPull }
 
 // finishBot gives the user Grok Bot's prompt, then asks for the webhook URL and
 // key Grok Bot answers with. The changes are applied by now, so stopping here
-// isn't an error: messages wait, and running onboarding again picks this up.
+// isn't an error: messages wait, and running setup again picks this up.
 func (w *wizard) finishBot(resuming bool) error {
 	later := func() {
-		fmt.Fprintf(w.out, "\nMessages to %s will wait. To finish, run birdie onboard again.\n", botAgent)
+		fmt.Fprintf(w.out, "\nMessages to %s will wait. To finish, run: birdie setup %s\n", botAgent, botAgent)
 		fmt.Fprintf(w.out, "Get the prompt at any time with: birdie agent prompt %s\n", botAgent)
 	}
 	fmt.Fprintln(w.out, "\nFinish Grok Bot:")

@@ -38,6 +38,7 @@ Usage:
   birdie onboard [--db PATH] [--url URL]
   birdie doctor [--db PATH] [--url URL]
   birdie setup claude|codex|grok|hermes|--all [--as NAME] [--remove] [--dry-run] [--wake]
+  birdie setup grok-bot [--webhook URL --auth-file PATH] [--remove] [--dry-run]
   birdie service install|remove|status [--db PATH]
   birdie mcp --as NAME [--no-push] [--channel [--server-name birdie]] [--url URL]
   birdie agent add NAME [--description TEXT] [--webhook URL [--auth-file PATH] [--auth-header H]]
@@ -424,7 +425,7 @@ func agentCmd(ctx context.Context, args []string) error {
 			return errors.New("usage: birdie agent prompt " + botAgent + " [--save]")
 		}
 		if _, err := st.GetAgent(ctx, botAgent); err != nil {
-			return fmt.Errorf("%s isn't connected yet; run: birdie onboard", botAgent)
+			return fmt.Errorf("%s isn't set up yet; run: birdie setup %s", botAgent, botAgent)
 		}
 		prompt, err := botPrompt(*url)
 		if err != nil {

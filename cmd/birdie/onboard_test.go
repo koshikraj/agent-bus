@@ -225,7 +225,7 @@ func TestOnboardGrokBotFinishLater(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if !strings.Contains(out, "run birdie onboard again") {
+	if !strings.Contains(out, "run: birdie setup grok-bot") {
 		t.Errorf("doesn't say how to finish:\n%s", out)
 	}
 	if !strings.Contains(out, "waiting for its webhook URL and key") {
@@ -282,6 +282,170 @@ func TestOnboardGrokBotUntickWhileWaiting(t *testing.T) {
 	}
 	if strings.Contains(out, "Finish Grok Bot") {
 		t.Errorf("tried to finish an agent it just removed:\n%s", out)
+	}
+}
+
+func TestSetupGrokBotInTerminal(t *testing.T) {
+	o := fakeTools(t)
+	var out bytes.Buffer
+	p := &fakePrompter{
+		lines:    []string{"https://hooks.example.com/1", ""},
+		secrets:  []string{"test-key-not-real"},
+		confirms: []bool{true},
+	}
+	if err := setupBot(context.Background(), o, "http://127.0.0.1:1", "", "", p, &out); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "BIRDIE_TOKEN = "+botToken(t)) {
+		t.Errorf("no prompt:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "The bus isn't running") {
+		t.Errorf("doesn't warn that the check will fail:\n%s", out.String())
+	}
+	a := botAgentRow(t, o)
+	if a.Delivery != "webhook" || a.Config["url"] != "https://hooks.example.com/1" {
+		t.Errorf("agent = %+v", a)
+	}
+	if !keyFileOK(routinePath()) {
+		t.Error("routine text wasn't saved")
+	}
+}
+
+func TestSetupGrokBotInScript(t *testing.T) {
+	o := fakeTools(t)
+	ctx := context.Background()
+	const url = "http://127.0.0.1:1"
+	run := func(webhook, authFile string) string {
+		t.Helper()
+		var out bytes.Buffer
+		if err := setupBot(ctx, o, url, webhook, authFile, nil, &out); err != nil {
+			t.Fatalf("%v\n%s", err, out.String())
+		}
+		return out.String()
+	}
+	out := run("", "")
+	token := botToken(t)
+	if strings.Contains(out, token) || exists(botPromptPath()) {
+		t.Errorf("gave out the token without being asked:\n%s", out)
+	}
+	for _, want := range []string{"birdie agent prompt grok-bot", "birdie setup grok-bot --webhook"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("next steps lack %q:\n%s", want, out)
+		}
+	}
+	if a := botAgentRow(t, o); a.Delivery != "pull" {
+		t.Errorf("agent = %+v", a)
+	}
+	run("", "") // running it twice is fine
+
+	keyFile := filepath.Join(o.home, "key")
+	os.WriteFile(keyFile, []byte("k\n"), 0o600)
+	run("https://hooks.example.com/1", keyFile)
+	a := botAgentRow(t, o)
+	if a.Delivery != "webhook" || a.Config["url"] != "https://hooks.example.com/1" || a.Config["auth_file"] != keyFile {
+		t.Errorf("agent = %+v", a)
+	}
+	if botToken(t) != token {
+		t.Error("connecting replaced the token, which the routine already has")
+	}
+	if out := run("", ""); !strings.Contains(out, "already set up") {
+		t.Errorf("rerun:\n%s", out)
+	}
+
+	// It can change the webhook, or do everything at once on a fresh machine.
+	run("https://hooks.example.com/2", keyFile)
+	if a := botAgentRow(t, o); a.Config["url"] != "https://hooks.example.com/2" {
+		t.Errorf("agent = %+v", a)
+	}
+	if botToken(t) != token {
+		t.Error("changing the webhook replaced the token")
+	}
+}
+
+func TestSetupGrokBotDirectlyWithWebhook(t *testing.T) {
+	o := fakeTools(t)
+	keyFile := filepath.Join(o.home, "key")
+	os.WriteFile(keyFile, []byte("k\n"), 0o600)
+	var out bytes.Buffer
+	if err := setupBot(context.Background(), o, "http://127.0.0.1:1", "https://hooks.example.com/1", keyFile, nil, &out); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if a := botAgentRow(t, o); a.Delivery != "webhook" {
+		t.Errorf("agent = %+v", a)
+	}
+	if !strings.Contains(out.String(), "birdie agent prompt grok-bot") {
+		t.Errorf("doesn't say how to get the prompt:\n%s", out.String())
+	}
+}
+
+func TestSetupGrokBotRefusals(t *testing.T) {
+	o := fakeTools(t)
+	ctx := context.Background()
+	keyFile := filepath.Join(o.home, "key")
+	os.WriteFile(keyFile, []byte("k\n"), 0o600)
+	for _, c := range [][2]string{
+		{"not a url", keyFile},
+		{"https://hooks.example.com/1", ""},
+		{"", keyFile},
+		{"https://hooks.example.com/1", filepath.Join(o.home, "missing")},
+	} {
+		if err := setupBot(ctx, o, "http://127.0.0.1:1", c[0], c[1], nil, &bytes.Buffer{}); err == nil {
+			t.Errorf("setupBot(%q, %q) should fail", c[0], c[1])
+		}
+	}
+	if exists(filepath.Join(tokenDir(), botAgent)) {
+		t.Error("a refused setup still registered the agent")
+	}
+	for _, args := range [][]string{
+		{botAgent, "--as", "other", "--db", o.db},
+		{"codex", "--webhook", "https://hooks.example.com/1", "--db", o.db},
+		{"--all", "--auth-file", keyFile, "--db", o.db},
+	} {
+		if err := setup(ctx, args); err == nil {
+			t.Errorf("setup %v should fail", args)
+		}
+	}
+}
+
+func TestSetupGrokBotDryRunAndRemove(t *testing.T) {
+	o := fakeTools(t)
+	ctx := context.Background()
+	const url = "http://127.0.0.1:1"
+	dry := o
+	dry.dry = true
+	var out bytes.Buffer
+	if err := setupBot(ctx, dry, url, "", "", nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "would add agent grok-bot") || exists(filepath.Join(tokenDir(), botAgent)) || exists(routinePath()) {
+		t.Errorf("dry run:\n%s", out.String())
+	}
+
+	if err := setupBot(ctx, o, url, "", "", nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := saveBotPrompt("prompt"); err != nil {
+		t.Fatal(err)
+	}
+	remove := o
+	remove.remove = true
+	dryRemove := remove
+	dryRemove.dry = true
+	if err := setupBot(ctx, dryRemove, url, "", "", nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if !exists(filepath.Join(tokenDir(), botAgent)) {
+		t.Error("the dry run removed the token")
+	}
+	if err := setupBot(ctx, remove, url, "", "", nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if exists(filepath.Join(tokenDir(), botAgent)) || exists(botPromptPath()) {
+		t.Error("left the token or prompt behind")
+	}
+	out.Reset()
+	if err := setupBot(ctx, remove, url, "", "", nil, &out); err != nil || !strings.Contains(out.String(), "nothing to remove") {
+		t.Errorf("%v\n%s", err, out.String())
 	}
 }
 
@@ -403,7 +567,7 @@ func TestOnboardGrokBotPromptQuestionCancelled(t *testing.T) {
 func TestAgentPromptCommand(t *testing.T) {
 	o := fakeTools(t)
 	ctx := context.Background()
-	if err := agentCmd(ctx, []string{"prompt", botAgent, "--db", o.db}); err == nil || !strings.Contains(err.Error(), "birdie onboard") {
+	if err := agentCmd(ctx, []string{"prompt", botAgent, "--db", o.db}); err == nil || !strings.Contains(err.Error(), "birdie setup grok-bot") {
 		t.Errorf("before connecting: %v", err)
 	}
 	if out, err := runWizard(t, o, botWizard(true, true), noSvc()); err != nil {

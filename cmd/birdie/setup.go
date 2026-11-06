@@ -70,13 +70,22 @@ func setup(ctx context.Context, args []string) error {
 	dry := fs.Bool("dry-run", false, "print what would change")
 	all := fs.Bool("all", false, "set up every tool found on PATH, without asking")
 	wake := fs.Bool("wake", false, "Hermes only: let other agents' messages start turns on their own; --wake=false turns that off")
+	webhook := fs.String("webhook", "", "Grok Bot only: its routine's webhook URL")
+	authFile := fs.String("auth-file", "", "Grok Bot only: file holding the webhook's key")
 	db := fs.String("db", defaultDB(), "SQLite database path")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) > 1 || (len(pos) == 0) != *all {
-		return errors.New("usage: birdie setup claude|codex|grok|hermes|--all [--as NAME] [--remove] [--dry-run] [--wake]\nFor a guided setup, run: birdie onboard")
+		return errors.New("usage: birdie setup claude|codex|grok|hermes|--all [--as NAME] [--remove] [--dry-run] [--wake]\n       birdie setup grok-bot [--webhook URL --auth-file PATH] [--remove] [--dry-run]\nFor a guided setup, run: birdie onboard")
+	}
+	isBot := len(pos) == 1 && pos[0] == botAgent
+	if !isBot && (*webhook != "" || *authFile != "") {
+		return errors.New("--webhook and --auth-file only apply to: birdie setup " + botAgent)
+	}
+	if isBot && *as != "" {
+		return errors.New("Grok Bot's agent is always named " + botAgent + ", so --as doesn't apply")
 	}
 	o, err := newSetupOptions(*db)
 	if err != nil {
@@ -94,8 +103,18 @@ func setup(ctx context.Context, args []string) error {
 	if *all {
 		return setupAll(ctx, o, os.Stdout)
 	}
+	if isBot {
+		var p prompter
+		if *webhook == "" && !o.remove && !o.dry {
+			if t, closeTerminal, err := openTerminal(ctx, os.Stdout); err == nil {
+				defer closeTerminal()
+				p = t
+			}
+		}
+		return setupBot(ctx, o, envOr("BIRDIE_URL", defaultURL), *webhook, *authFile, p, os.Stdout)
+	}
 	if _, ok := setupTools[pos[0]]; !ok {
-		return fmt.Errorf("can't set up %q; choose claude, codex, grok or hermes", pos[0])
+		return fmt.Errorf("can't set up %q; choose claude, codex, grok, hermes or %s", pos[0], botAgent)
 	}
 	return setupOne(ctx, pos[0], o, o.dry)
 }

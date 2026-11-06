@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"birdie"
+	"birdie/internal/bus"
 )
 
 // botPromptTemplate is what the user gives Grok Bot to finish its setup. It
@@ -66,4 +70,87 @@ func saveBotPrompt(prompt string) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+// setupBot is `birdie setup grok-bot`: the Grok Bot part of onboarding, on its
+// own. With no terminal to ask in, p is nil and the webhook comes from flags.
+func setupBot(ctx context.Context, o setupOptions, url, webhook, authFile string, p prompter, out io.Writer) error {
+	w := &wizard{ctx: ctx, p: p, out: out, o: o, url: url}
+	delivery := w.botDelivery()
+
+	if o.remove {
+		switch {
+		case delivery == "":
+			fmt.Fprintf(out, "%s isn't set up, so there's nothing to remove\n", botAgent)
+			return nil
+		case o.dry:
+			fmt.Fprintf(out, "would delete agent %s and its token; its routine would need a new token if you reconnect\n", botAgent)
+			return nil
+		}
+		return w.deleteAgent(botAgent)
+	}
+
+	var details *botDetails
+	if webhook != "" || authFile != "" {
+		if webhook == "" || authFile == "" {
+			return errors.New("--webhook and --auth-file go together")
+		}
+		if !validWebhookURL(webhook) {
+			return errors.New("--webhook doesn't look like a web address; it should start with https://")
+		}
+		abs, err := filepath.Abs(expandHome(authFile, o.home))
+		if err != nil {
+			return err
+		}
+		if !keyFileOK(abs) {
+			return fmt.Errorf("can't read a key from %s", authFile)
+		}
+		details = &botDetails{url: webhook, keyFile: abs}
+	}
+
+	if o.dry {
+		if delivery == "" {
+			fmt.Fprintf(out, "would add agent %s and save its token to %s\n", botAgent, filepath.Join(tokenDir(), botAgent))
+			fmt.Fprintf(out, "would save the routine text to %s\n", routinePath())
+		}
+		switch {
+		case details != nil:
+			fmt.Fprintf(out, "would deliver to %s, reading the key from %s\n", urlHost(details.url), details.keyFile)
+		case delivery == "webhook":
+			fmt.Fprintf(out, "%s already delivers to its webhook, so nothing would change\n", botAgent)
+		default:
+			fmt.Fprintln(out, "would give you a prompt for Grok Bot, and ask for the webhook URL and key it gives you")
+		}
+		return nil
+	}
+
+	if delivery == "webhook" && details == nil {
+		fmt.Fprintf(out, "%s is already set up. To get its prompt: birdie agent prompt %s\n", botAgent, botAgent)
+		fmt.Fprintf(out, "To change its webhook: birdie setup %s --webhook URL --auth-file PATH\n", botAgent)
+		return nil
+	}
+	if delivery == "" {
+		if err := w.registerBot(); err != nil {
+			return err
+		}
+	}
+	if details != nil {
+		if err := w.connectBot(*details); err != nil {
+			return err
+		}
+		if delivery != "webhook" {
+			fmt.Fprintf(out, "If Grok Bot doesn't have its prompt yet, get it with: birdie agent prompt %s\n", botAgent)
+		}
+		return nil
+	}
+	if !busUp(ctx, url) {
+		fmt.Fprintf(out, "The bus isn't running at %s, and Grok Bot's check needs it. Start it with: birdie service install, or birdie serve\n", url)
+	}
+	if p == nil {
+		fmt.Fprintln(out, "There's no terminal to ask in, so finish in two steps:")
+		fmt.Fprintf(out, "  1. Give Grok Bot its prompt, from: birdie agent prompt %s\n", botAgent)
+		fmt.Fprintf(out, "  2. Enter what it gives you: birdie setup %s --webhook URL --auth-file PATH\n", botAgent)
+		return nil
+	}
+	return w.finishBot(delivery == bus.DeliveryPull)
 }
