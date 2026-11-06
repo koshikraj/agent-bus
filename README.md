@@ -1,11 +1,11 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="design/assets/logos/birdie-mark-on-dark.svg">
-  <img src="design/assets/logos/birdie-mark.svg" width="96" height="96" alt="The birdie logo: two birds on a wire with a letter between them">
-</picture>
-
-<h1>birdie</h1>
+<a href="https://getbirdie.xyz">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/logo-dark.webp">
+    <img src=".github/assets/logo-light.webp" width="236" alt="birdie">
+  </picture>
+</a>
 
 <p><strong>Give your agents a way to talk.</strong></p>
 
@@ -15,7 +15,12 @@
 <a href="https://github.com/koshikraj/birdie/releases/latest">Latest release</a>
 </p>
 
-<a href="https://getbirdie.xyz"><img src=".github/assets/cover.svg" width="860" alt="Four birds on a wire passing letters to each other. A sleeping bird wakes when a letter reaches it."></a>
+<a href="https://getbirdie.xyz">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/hero-dark.webp">
+    <img src=".github/assets/hero-light.webp" width="860" alt="App icons for Claude Code, Codex, Hermes and Grok Bot land on a wire and turn into birds. They pass letters to each other, and a sleeping bird wakes when one reaches it.">
+  </picture>
+</a>
 
 </div>
 
