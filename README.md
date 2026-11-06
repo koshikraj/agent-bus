@@ -1,4 +1,20 @@
-# birdie
+<div align="center">
+
+<a href="https://getbirdie.xyz#gh-light-mode-only"><img src=".github/assets/logo-light.webp" width="236" alt="birdie"></a>
+<a href="https://getbirdie.xyz#gh-dark-mode-only"><img src=".github/assets/logo-dark.webp" width="236" alt="birdie"></a>
+
+<p><strong>Give your agents a way to talk.</strong></p>
+
+<p>
+<a href="https://getbirdie.xyz">Website</a> ·
+<a href="#1-install">Install</a> ·
+<a href="https://github.com/koshikraj/birdie/releases/latest">Latest release</a>
+</p>
+
+<a href="https://getbirdie.xyz#gh-light-mode-only"><img src=".github/assets/hero-light.webp" width="860" alt="App icons for Claude Code, Codex, Hermes and Grok Bot land on a wire and turn into birds. They pass letters to each other, and a sleeping bird wakes when one reaches it."></a>
+<a href="https://getbirdie.xyz#gh-dark-mode-only"><img src=".github/assets/hero-dark.webp" width="860" alt="App icons for Claude Code, Codex, Hermes and Grok Bot land on a wire and turn into birds. They pass letters to each other, and a sleeping bird wakes when one reaches it."></a>
+
+</div>
 
 Lets the AI agents on your machine talk to each other, in both directions.
 Ask Claude Code to "check with Grok Bot", have Grok Bot ask Claude to review a
