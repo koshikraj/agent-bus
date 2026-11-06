@@ -125,6 +125,7 @@ code, .mono { font-family: var(--font-mono); }
 .log li[data-s="future"] { opacity: 0.38; }
 .log li[data-s="now"] { background: var(--surface); }
 .note { margin-top: 14px; padding-inline: 10px; font-size: 14px; line-height: 1.4; color: var(--ink-muted); }
+.note code { white-space: nowrap; color: var(--ink); }
 .flow-foot { display: flex; justify-content: flex-end; }
 
 /* Install */
@@ -189,20 +190,20 @@ code, .mono { font-family: var(--font-mono); }
         <a href="#install">Install</a>
         <a href="https://github.com/koshikraj/birdie"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.77-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>GitHub</a>
         <a href="https://x.com/rajkoshik"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.6 1h2.3L9.8 6.8 15.8 15h-4.7L7.4 10.100 3.200 15H.9l5.400-6.200L.5 1h4.800l3.300 4.500L12.600 1Zm-.8 12.600h1.300L4.700 2.300H3.300l8.500 11.300Z"/></svg>X</a>
-        <a href="https://github.com/koshikraj/birdie/releases/latest">Release v0.1.0</a>
+        <a href="https://github.com/koshikraj/birdie/releases/latest" data-release>Latest release</a>
       </div>
     </nav>
     <div class="hero-copy">
       <h1>Give your agents a way to talk.</h1>
       <div class="hero-side">
-        <p class="lede">birdie lets Claude Code, Codex, Grok and Grok Bot message each other from your machine. Every message has a verified sender, and every answer returns to the session that asked.</p>
+        <p class="lede">birdie lets Claude Code, Codex, Grok, Hermes and Grok Bot message each other from your machine. Every message has a verified sender, and every answer returns to the session that asked.</p>
         <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/koshikraj/birdie/main/install.sh | sh</code><button type="button" id="copy-hero" data-copy>Copy</button></div>
       </div>
     </div>
     <div class="stage">
-      <svg id="hero-svg" role="img" aria-label="Four app icons named claude code, codex, grok and grok bot land on a wire and turn into birds. They pass letters along the wire and answer each other, then turn back into icons."></svg>
+      <svg id="hero-svg" role="img" aria-label="Five app icons named claude code, codex, grok, hermes and grok bot land on a wire and turn into birds. They pass letters along the wire and answer each other, then turn back into icons."></svg>
       <div class="stage-foot">
-        <p class="caption" id="hero-caption">Four agents, four separate windows.</p>
+        <p class="caption" id="hero-caption">Five agents, five separate windows.</p>
         <button type="button" class="ctl" id="hero-ctl">Pause</button>
       </div>
     </div>
@@ -224,13 +225,13 @@ code, .mono { font-family: var(--font-mono); }
       </ol>
       <div class="flow-grid">
         <div class="flow-stage">
-          <svg id="flow-svg" viewBox="0 0 640 566" role="img" aria-label="A red bird named claude sits at the center of three wires. Letters travel to grok-bot for design, codex for review and grok for deploy, and answers travel back."></svg>
+          <svg id="flow-svg" viewBox="0 0 640 566" role="img" aria-label="A red bird named claude sits at the center of three wires. Letters travel to grok-bot for design, codex for review and hermes for deploy, and answers travel back."></svg>
           <p class="flow-now" id="flow-now" aria-hidden="true"></p>
           <div class="flow-foot"><button type="button" class="ctl" id="flow-ctl">Play</button></div>
         </div>
         <div>
           <ol class="log" id="log" aria-label="Example messages"></ol>
-          <p class="note">An example. You choose which agent does what, and each one works with its own tools. birdie carries the messages and checks who sent them.</p>
+          <p class="note">An example. You choose which agent does what, and each one works with its own tools. birdie carries the messages and checks who sent them. Hermes only wakes on a message if you set it up with <code>birdie setup hermes --wake</code>. Otherwise messages wait for its next turn.</p>
         </div>
       </div>
     </div>
@@ -250,7 +251,9 @@ code, .mono { font-family: var(--font-mono); }
           <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Claude Code</li>
           <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Codex</li>
           <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Grok CLI</li>
+          <li class="on"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.500 6 2.900 4.600 4.800 6.500 9.100 2 10.500 3.400 4.800 9.300Z"/></svg></i>Hermes</li>
           <li><i></i>Headless Grok</li>
+          <li><i></i>Headless Hermes</li>
           <li><i></i>Grok Bot</li>
         </ul>
         <p>Nothing changes until you confirm. Restart any open sessions afterwards.</p>
@@ -272,7 +275,7 @@ code, .mono { font-family: var(--font-mono); }
       <div class="links">
         <a href="https://github.com/koshikraj/birdie"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.77-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>GitHub</a>
         <a href="https://x.com/rajkoshik"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.6 1h2.3L9.8 6.8 15.8 15h-4.7L7.4 10.100 3.200 15H.9l5.400-6.200L.5 1h4.800l3.300 4.500L12.600 1Zm-.8 12.600h1.300L4.700 2.300H3.300l8.500 11.300Z"/></svg>@rajkoshik</a>
-        <a href="https://github.com/koshikraj/birdie/releases/latest">Release v0.1.0</a>
+        <a href="https://github.com/koshikraj/birdie/releases/latest" data-release>Latest release</a>
       </div>
     </div>
     <p class="close-note">The message bus runs on your machine at 127.0.0.1:7777. It speaks MCP, webhooks and ACP, and keeps messages in SQLite.</p>
@@ -314,7 +317,7 @@ code, .mono { font-family: var(--font-mono); }
   var TILE = { w: 68, h: 68, rx: 17 };
   function pts(str) { return str.split(" ")[0].split(",").map(Number); }
 
-  function makeBird(parent, spec, face, tileColor) {
+  function makeBird(parent, spec, face, tileColor, glyphText) {
     var c = spec.c, g = el("g", {}, parent), turn = el("g", { transform: "scale(" + face + " 1)" }, g);
     var bodyFill = tileColor || ("agent-" + c);
     var tail = el("polygon", { points: spec.tail, style: fill("agent-" + c) }, turn);
@@ -324,7 +327,7 @@ code, .mono { font-family: var(--font-mono); }
     var eyeW = el("circle", { r: 9, cx: spec.eye[0], cy: spec.eye[1], style: fill("bird-eye") }, turn);
     var eyeP = el("circle", { r: 4.5, cx: spec.eye[0] + 3, cy: spec.eye[1], style: fill("bird-pupil") }, turn);
     var eyeS = el("rect", { x: spec.eye[0] - 8, y: spec.eye[1] - 2, width: 16, height: 4, rx: 2, style: fill("bird-eye") }, turn);
-    var glyph = el("text", { x: 0, y: -25, "text-anchor": "middle", "font-size": 26, "font-weight": 500, style: "font-family:var(--font-mono);" + fill(tileColor ? "on-action" : "agent-" + c + "-on") }, g, spec.glyph);
+    var glyph = el("text", { x: 0, y: -25, "text-anchor": "middle", "font-size": 26, "font-weight": 500, style: "font-family:var(--font-mono);" + fill(tileColor ? "on-action" : "agent-" + c + "-on") }, g, glyphText || spec.glyph);
     var tp = pts(spec.tail), bp = pts(spec.beak);
     function part(n, ox, oy, s, extra) {
       n.setAttribute("transform", "translate(" + ox + " " + oy + ") scale(" + s + ") translate(" + (-ox) + " " + (-oy) + ")" + (extra || ""));
@@ -334,6 +337,7 @@ code, .mono { font-family: var(--font-mono); }
       g: g,
       update: function (o) {
         var p = o.p, s = o.s || 1;
+        if (o.face != null) turn.setAttribute("transform", "scale(" + o.face + " 1)");
         var w = lerp(TILE.w, spec.w, p), h = lerp(TILE.h, spec.h, p);
         w = Math.max(10, w); h = Math.max(10, h);
         var rx = Math.min(Math.max(lerp(TILE.rx, spec.rx, p), 4), w / 2, h / 2);
@@ -387,46 +391,52 @@ code, .mono { font-family: var(--font-mono); }
 
   /* ---------- hero: icons land on a wire, turn into birds, trade letters, turn back ---------- */
   var heroSvg = document.getElementById("hero-svg"), heroCaption = document.getElementById("hero-caption");
-  var HERO_T = 16;
+  var HERO_T = 19;
   var CAPTIONS = [
-    [0, "Four agents, four separate windows."],
+    [0, "Five agents, five separate windows."],
     [1.4, "birdie puts them on one wire."],
     [3.3, "Any agent can message any other."],
     [7.1, "A message wakes an idle session."],
-    [10.8, "Every answer returns to the session that asked."],
-    [14.2, "Install it once. They stay connected."]
+    [10.6, "Hermes joins in through its own plugin."],
+    [13.8, "Every answer returns to the session that asked."],
+    [17.2, "Install it once. They stay connected."]
   ];
+  // The two Grok agents share a shape: past four agents, shapes repeat and the name tells them apart.
   var HERO_AGENTS = [
-    { label: "claude code", spec: SPECS.dot, face: 1, morph: 1.5, pushes: [4.0, 10.8], hops: [6.9, 12.0] },
-    { label: "codex", spec: SPECS.dash, face: 1, morph: 1.85, pushes: [7.7, 11.3], hops: [10.2, 12.5] },
-    { label: "grok", spec: SPECS.arch, face: -1, morph: 2.2, pushes: [5.9, 11.5], hops: [5.0, 12.3] },
-    { label: "grok bot", spec: SPECS.box, face: -1, morph: 2.55, pushes: [9.4, 11.0], hops: [8.5, 11.8] }
+    { label: "claude code", short: "claude", spec: SPECS.dot, face: 1, morph: 1.5, pushes: [4.0, 13.8], hops: [6.9, 15.0] },
+    { label: "codex", spec: SPECS.dash, face: 1, morph: 1.8, pushes: [7.7, 14.3], hops: [10.2, 15.5] },
+    { label: "grok", spec: SPECS.arch, glyph: "/?", face: -1, morph: 2.1, turn: [10.4, 13.6], pushes: [5.9, 12.8, 14.5], hops: [5.0, 11.9, 15.3] },
+    { label: "hermes", spec: SPECS.box, glyph: "=>", face: -1, morph: 2.4, pushes: [11.2, 14.15], hops: [13.5, 16.0] },
+    { label: "grok bot", spec: SPECS.arch, glyph: "o o", face: -1, morph: 2.7, pushes: [9.4, 14.0], hops: [8.5, 14.8] }
   ];
   var HERO_LETTERS = [
     { a: 0, b: 2, at: 4.0, dur: 1.0, tone: "request" }, { a: 2, b: 0, at: 5.9, dur: 1.0, tone: "reply" },
-    { a: 1, b: 3, at: 7.7, dur: 0.8, tone: "request" }, { a: 3, b: 1, at: 9.4, dur: 0.8, tone: "reply" },
-    { a: 0, b: 3, at: 10.8, dur: 1.0, tone: "request" }, { a: 3, b: 0, at: 11.0, dur: 1.0, tone: "reply" },
-    { a: 1, b: 2, at: 11.3, dur: 1.0, tone: "request" }, { a: 2, b: 1, at: 11.5, dur: 1.0, tone: "reply" }
+    { a: 1, b: 4, at: 7.7, dur: 0.8, tone: "request" }, { a: 4, b: 1, at: 9.4, dur: 0.8, tone: "reply" },
+    { a: 3, b: 2, at: 11.2, dur: 0.7, tone: "request" }, { a: 2, b: 3, at: 12.8, dur: 0.7, tone: "reply" },
+    { a: 0, b: 4, at: 13.8, dur: 1.0, tone: "request" }, { a: 4, b: 0, at: 14.0, dur: 1.0, tone: "reply" },
+    { a: 3, b: 0, at: 14.15, dur: 1.0, tone: "request" }, { a: 1, b: 2, at: 14.3, dur: 1.0, tone: "request" },
+    { a: 2, b: 1, at: 14.5, dur: 1.0, tone: "reply" }
   ];
   var HERO_BUBBLES = [
     { a: 0, text: "grok, check my math?", from: 3.3, to: 4.9 }, { a: 2, text: "off by one.", from: 5.2, to: 6.9 },
-    { a: 1, text: "any meetings today?", from: 7.1, to: 8.6 }, { a: 3, text: "free till 3.", from: 8.8, to: 10.4 }
+    { a: 1, text: "any meetings today?", from: 7.1, to: 8.6 }, { a: 4, text: "free till 3.", from: 8.8, to: 10.4 },
+    { a: 3, text: "grok, got the logs?", from: 10.6, to: 12.1 }, { a: 2, text: "sending them.", from: 12.2, to: 13.6 }
   ];
-  var WAKE = 8.5, UNMORPH = 14.1;
+  var WAKE = 8.5, UNMORPH = 17.1, SLEEPER = 4;
   var heroScene = null;
 
   function buildHero(narrow) {
     while (heroSvg.firstChild) heroSvg.removeChild(heroSvg.firstChild);
     var L = narrow
-      ? { w: 760, h: 410, xs: [100, 290, 480, 670], wire: 320, S: 1.3, fs: 26, lab: 26, labY: 366, letter: 1.35 }
-      : { w: 1160, h: 340, xs: [170, 440, 720, 990], wire: 262, S: 1.25, fs: 20, lab: 20, labY: 300, letter: 1.1 };
+      ? { w: 800, h: 410, xs: [90, 245, 400, 555, 710], wire: 320, S: 1.3, fs: 26, lab: 26, labY: 366, letter: 1.35 }
+      : { w: 1160, h: 340, xs: [130, 355, 580, 805, 1030], wire: 262, S: 1.25, fs: 20, lab: 20, labY: 300, letter: 1.1 };
     heroSvg.setAttribute("viewBox", "0 0 " + L.w + " " + L.h);
     var wire = el("rect", { y: L.wire, height: 6, rx: 3, style: fill("bird-line") }, heroSvg);
     var agents = HERO_AGENTS.map(function (a, i) {
-      var label = el("text", { x: L.xs[i], y: L.labY, "text-anchor": "middle", "font-size": L.lab, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, heroSvg, a.label);
+      var label = el("text", { x: L.xs[i], y: L.labY, "text-anchor": "middle", "font-size": L.lab, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, heroSvg, narrow && a.short ? a.short : a.label);
       var bits = [];
       for (var k = 0; k < 7; k++) bits.push(el("circle", { r: 5, style: fill("agent-" + a.spec.c) }, heroSvg));
-      return { a: a, x: L.xs[i], bird: makeBird(heroSvg, a.spec, a.face), bits: bits, label: label };
+      return { a: a, x: L.xs[i], bird: makeBird(heroSvg, a.spec, a.face, null, a.glyph), bits: bits, label: label };
     });
     var zs = [0, 1, 2].map(function () { return el("text", { "font-size": L.fs + 6, "font-weight": 800, style: "font-family:var(--font-display);" + fill("ink") }, heroSvg, "z"); });
     var bubbles = HERO_BUBBLES.map(function (b) { return { b: b, ui: makeBubble(heroSvg, b.text, L.fs) }; });
@@ -446,7 +456,7 @@ code, .mono { font-family: var(--font-mono); }
   function renderHero(t) {
     var sc = heroScene, L = sc.L;
     // The wire draws out from the middle and reaches past both page edges.
-    var draw = inOut(seg(t, 0.8, 1.4)) * (1 - inOut(seg(t, 15.2, 15.7)));
+    var draw = inOut(seg(t, 0.8, 1.4)) * (1 - inOut(seg(t, 18.2, 18.7)));
     var half = draw * 3200;
     sc.wire.setAttribute("x", L.w / 2 - half); sc.wire.setAttribute("width", half * 2);
     show(sc.wire, draw > 0.001);
@@ -457,17 +467,17 @@ code, .mono { font-family: var(--font-mono); }
       var pOut = inOut(seg(t, UNMORPH + i * 0.14, UNMORPH + i * 0.14 + 0.5));
       var p = t < UNMORPH ? pIn : 1 - pOut;
       // Before the wire arrives, and after it goes, the tiles float on their own.
-      var land = inOut(seg(t, 1.2, 1.5)) * (1 - inOut(seg(t, 15.1, 15.5)));
+      var land = inOut(seg(t, 1.2, 1.5)) * (1 - inOut(seg(t, 18.1, 18.5)));
       var floaty = (1 - land) * (22 + Math.sin(t * 2 + i * 1.7) * 6);
       var y = L.wire - floaty - hops(t, a.hops, 0.42, 30) - hops(t, [a.morph], 0.5, 26);
+      var face = a.face;
+      if (a.turn) face = a.face * (1 - 2 * (inOut(seg(t, a.turn[0], a.turn[0] + 0.3)) - inOut(seg(t, a.turn[1], a.turn[1] + 0.3))));
       var lean = 0;
-      a.pushes.forEach(function (at) { lean += bump(t, at - 0.12, 0.5) * 16 * a.face; });
-      var asleep = i === 3 && t < WAKE;
-      ag.bird.update({ x: ag.x, y: y, p: p, s: L.S, lean: lean, asleep: asleep });
+      a.pushes.forEach(function (at) { lean += bump(t, at - 0.12, 0.5) * 16 * face; });
+      var asleep = i === SLEEPER && t < WAKE;
+      ag.bird.update({ x: ag.x, y: y, p: p, s: L.S, lean: lean, asleep: asleep, face: face });
       // Feather pop on each change.
-      [a.morph + 0.12, UNMORPH + i * 0.14 + 0.2].forEach(function (b, bi) {
-        if (bi === 0) { ag.bits.forEach(function (n) { show(n, false); }); }
-      });
+      ag.bits.forEach(function (n) { show(n, false); });
       [a.morph + 0.12, UNMORPH + i * 0.14 + 0.2].forEach(function (b) {
         var q = seg(t, b, b + 0.6);
         if (q > 0 && q < 1) ag.bits.forEach(function (n, k) {
@@ -482,7 +492,7 @@ code, .mono { font-family: var(--font-mono); }
     });
 
     // z z z over the sleeping agent, until the letter lands.
-    var sleeper = sc.agents[3];
+    var sleeper = sc.agents[SLEEPER];
     sc.zs.forEach(function (z, k) {
       var on = t > sleeper.a.morph + 0.5 && t < WAKE;
       show(z, on);
@@ -528,8 +538,8 @@ code, .mono { font-family: var(--font-mono); }
     { from: "codex", to: "claude", tid: "review", text: "The toggle resets on reload. One fix needed.", after: 1.5 },
     { from: "claude", to: "codex", tid: "review", text: "Fixed. Another look?" },
     { from: "codex", to: "claude", tid: "review", text: "Looks good. Approved." },
-    { from: "claude", to: "grok", tid: "deploy", text: "Approved. Please deploy to staging." },
-    { from: "grok", to: "claude", tid: "deploy", text: "It's live on staging and the smoke tests pass." },
+    { from: "claude", to: "hermes", tid: "deploy", text: "Approved. Please deploy to staging." },
+    { from: "hermes", to: "claude", tid: "deploy", text: "It's live on staging and the smoke tests pass." },
     { from: "claude", to: "you", text: "Dark mode is on staging, reviewed and tested." }
   ];
   (function () { var s = 0.4; STEPS.forEach(function (st) { st.at = s; s += 1 + (st.after == null ? 0.65 : st.after); }); STEPS.end = STEPS[STEPS.length - 1].at + 1; })();
@@ -554,7 +564,7 @@ code, .mono { font-family: var(--font-mono); }
     var NODES = {
       "grok-bot": { x: 510, y: 132, spec: SPECS.arch, role: "design", path: "M205 324 C 300 324 300 134 440 134" },
       "codex": { x: 510, y: 310, spec: SPECS.dash, role: "review", path: "M205 324 Q 320 376 440 312" },
-      "grok": { x: 510, y: 480, spec: SPECS.box, role: "deploy", path: "M205 324 C 300 324 300 482 440 482" },
+      "hermes": { x: 510, y: 480, spec: SPECS.box, role: "deploy", path: "M205 324 C 300 324 300 482 440 482" },
       "you": { path: "M130 120 L130 214" }
     };
     var wires = {};
@@ -571,7 +581,7 @@ code, .mono { font-family: var(--font-mono); }
     el("text", { x: F.x, y: F.y + 36, "text-anchor": "middle", "font-size": 24, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, svg, "claude");
     el("text", { x: F.x, y: F.y + 62, "text-anchor": "middle", "font-size": 19, style: "font-family:var(--font-mono);" + fill("ink-muted") }, svg, "coordinator");
     var birds = {};
-    ["grok-bot", "codex", "grok"].forEach(function (k) {
+    ["grok-bot", "codex", "hermes"].forEach(function (k) {
       var n = NODES[k];
       el("rect", { x: n.x - 70, y: n.y, width: 140, height: 5, rx: 2.500, style: fill("bird-line") }, svg);
       el("text", { x: n.x, y: n.y + 32, "text-anchor": "middle", "font-size": 21, "font-weight": 500, style: "font-family:var(--font-mono);" + fill("ink") }, svg, k + " · " + n.role);
@@ -606,7 +616,7 @@ code, .mono { font-family: var(--font-mono); }
     var letters = STEPS.map(function (st) { return makeLetter(svg, st.from === "claude" || st.from === "you" ? "request" : "reply"); });
 
     // A colleague is awake from when a request lands until just after it answers.
-    var windows = { "grok-bot": [], "codex": [], "grok": [] };
+    var windows = { "grok-bot": [], "codex": [], "hermes": [] };
     STEPS.forEach(function (st, i) {
       if (windows[st.to] && STEPS[i + 1]) windows[st.to].push([st.at + 1, STEPS[i + 1].at + 1.2]);
     });
@@ -737,6 +747,17 @@ code, .mono { font-family: var(--font-mono); }
     heroPlayer.setPlaying(!reduced.matches, HERO_STILL);
     flowPlayer.setPlaying(!reduced.matches, FLOW_T - 0.01);
   });
+
+  /* ---------- release label: ask GitHub, and keep "Latest release" if that fails ---------- */
+  if (window.fetch) {
+    fetch("https://api.github.com/repos/koshikraj/birdie/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !/^v?\d+\.\d+\.\d+[0-9A-Za-z.+-]*$/.test(d.tag_name || "")) return;
+        Array.prototype.forEach.call(document.querySelectorAll("[data-release]"), function (a) { a.textContent = "Release " + d.tag_name; });
+      })
+      .catch(function () {});
+  }
 
   /* ---------- copy buttons ---------- */
   Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (btn) {
